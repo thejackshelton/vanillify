@@ -208,7 +208,11 @@ Plans:
   3. All Tailwind imports exist in exactly one file (`pipeline/generator.ts`) -- no other source file imports from `tailwindcss`
   4. `convert()` called without options produces identical behavior to v1.x -- the default path is fully backward compatible
   5. `convert()` with `customVariants` (CSS string) and `themeCss` (CSS string or `@theme {}` block) produces correct output via native Tailwind processing
-**Plans**: TBD
+**Plans:** 2 plans
+
+Plans:
+- [ ] 11-01-PLAN.md -- Delete dead UnoCSS code, remove dependencies, rename Tailwind adapter to canonical generator.ts
+- [ ] 11-02-PLAN.md -- API backward compatibility test suite
 
 ## Progress
 
@@ -227,4 +231,4 @@ Phases execute in numeric order: 8 -> 9 -> 10 -> 11
 | 8. Regression Test Baseline | v2.0 | 1/1 | Complete | - |
 | 9. Tailwind Adapter Module | v2.0 | 0/1 | Not started | - |
 | 10. Pipeline Wiring and Rewriter Adaptation | v2.0 | 2/2 | Complete   | 2026-04-05 |
-| 11. Cleanup and API Verification | v2.0 | 0/0 | Not started | - |
+| 11. Cleanup and API Verification | v2.0 | 0/2 | Not started | - |
