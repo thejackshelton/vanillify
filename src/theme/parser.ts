@@ -22,17 +22,17 @@ export function parseThemeCss(themeCss: string): ParseThemeResult {
 
   const warnings: Warning[] = [];
 
+  // Strip CSS comments first so they don't interfere with block extraction
+  const stripped = trimmed.replace(/\/\*[\s\S]*?\*\//g, "");
+
   // Extract content from all @theme { ... } blocks, or use as bare declarations
   let content: string;
-  const themeBlocks = [...trimmed.matchAll(/@theme\s*\{([^}]*)\}/g)];
+  const themeBlocks = [...stripped.matchAll(/@theme\s*\{([^}]*)\}/g)];
   if (themeBlocks.length > 0) {
     content = themeBlocks.map((m) => m[1]).join("\n");
   } else {
-    content = trimmed;
+    content = stripped;
   }
-
-  // Strip CSS comments (T-06-02: lazy quantifier to avoid ReDoS)
-  content = content.replace(/\/\*[\s\S]*?\*\//g, "");
 
   // Split on semicolons and process each segment
   const segments = content.split(";");
