@@ -16,7 +16,7 @@ export async function getGenerator(
   customVariants?: VariantObject[],
 ): Promise<Awaited<ReturnType<typeof createGenerator>>> {
   const key = customVariants?.length
-    ? customVariants.map(v => v.name ?? '').sort().join(',')
+    ? customVariants.map(v => `${v.name ?? ''}:${String(v.match)}`).sort().join(',')
     : '__default__'
 
   let gen = _cache.get(key)
@@ -45,9 +45,25 @@ export interface GenerateCSSResult {
  * Strip @layer wrappers from CSS output, returning only the inner rules.
  */
 function stripLayerWrappers(css: string): string {
-  // Match @layer <name> { ... } blocks and extract inner content
-  const stripped = css.replace(/@layer\s+[\w-]+\s*\{([\s\S]*?)\}\s*$/gm, '$1')
-  return stripped.trim()
+  // Match @layer blocks and extract inner content, handling nested braces
+  const result: string[] = []
+  const regex = /@layer\s+[\w-]+\s*\{/g
+  let match: RegExpExecArray | null
+
+  while ((match = regex.exec(css)) !== null) {
+    let depth = 1
+    let i = match.index + match[0].length
+    const start = i
+    while (i < css.length && depth > 0) {
+      if (css[i] === '{') depth++
+      else if (css[i] === '}') depth--
+      i++
+    }
+    // Extract content between outer braces (excluding the final closing brace)
+    result.push(css.slice(start, i - 1).trim())
+  }
+
+  return result.length > 0 ? result.join('\n') : css.trim()
 }
 
 /**

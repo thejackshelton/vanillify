@@ -85,9 +85,6 @@ function extractStaticFragments(expression: any): string[] {
   // Logical AND: className={cond && "a b"}
   else if (expression.type === 'LogicalExpression') {
     fragments.push(...extractStaticFragments(expression.right))
-    if (expression.left.type === 'Literal' && typeof expression.left.value === 'string') {
-      fragments.push(...extractStaticFragments(expression.left))
-    }
   }
   // Template literal: className={`flex ${var}`} -- extract static quasis
   else if (expression.type === 'TemplateLiteral') {
