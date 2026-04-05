@@ -1,7 +1,7 @@
 # Requirements: Vanillify
 
 **Defined:** 2026-04-05
-**Core Value:** Accurate, reliable conversion of Tailwind classes to vanilla CSS via UnoCSS's createGenerator
+**Core Value:** Accurate, reliable conversion of Tailwind classes to vanilla CSS — powered by Tailwind's native compile().build() API
 
 ## v1.0 Requirements (Shipped)
 
@@ -13,52 +13,64 @@ All v1.0 requirements completed. See MILESTONES.md for details.
 - ✓ **CLI-01**, **CLI-02**: CLI wrapper
 - ✓ **PKG-01** through **PKG-03**: Build and package (dual ESM+CJS, typed exports, fixture tests)
 
-## v1.1 Requirements
+## v1.1 Requirements (Shipped)
 
-Requirements for Toolchain & Theme Support milestone.
+- ✓ **TOOL-01** through **TOOL-05**: Toolchain (pnpm, vite-plus, lint, fmt)
+- ✓ **QUAL-01**, **QUAL-02**: Code quality (magic-regexp, dynamic regex docs)
+- ✓ **THEME-01** through **THEME-10**: Theme support (@theme blocks, namespace mapping, CLI --theme flag)
+- ✓ **MOD-01** through **MOD-08**: CSS Modules output (--format css-modules, styles.nodeN, .module.css)
 
-### Toolchain
+## v2.0 Requirements
 
-- [ ] **TOOL-01**: Project uses pnpm as package manager with pnpm-lock.yaml and `packageManager` field in package.json
-- [ ] **TOOL-02**: Single vite.config.ts with `defineConfig` from vite-plus replaces tsdown.config.ts and vitest.config.ts (pack + test blocks)
-- [ ] **TOOL-03**: Package scripts use `vp pack` and `vp test` instead of direct tsdown/vitest commands
-- [ ] **TOOL-04**: vite-plus lint block configured with project lint rules (replaces standalone eslint setup)
-- [ ] **TOOL-05**: vite-plus fmt block configured with project formatting rules
+Requirements for the Tailwind compile() engine migration.
 
-### Code Quality
+### Engine
 
-- [ ] **QUAL-01**: All static regex patterns replaced with magic-regexp (variant parser, generator layer regex, CLI extension matching)
-- [ ] **QUAL-02**: Dynamic regex patterns in rewriter.ts documented as intentionally raw (runtime construction incompatible with magic-regexp)
+- [ ] **ENG-01**: `convert()` produces CSS using Tailwind v4's `compile().build()` API instead of UnoCSS's `createGenerator().generate()`
+- [ ] **ENG-02**: Tailwind compiler resolves `@import "tailwindcss"` via a `loadStylesheet` callback without filesystem dependency
+- [ ] **ENG-03**: `source(none)` directive disables Tailwind's automatic file scanning — candidates come from oxc-parser only
+- [ ] **ENG-04**: Compiler instances are cached by CSS input hash to avoid redundant `compile()` calls
+- [ ] **ENG-05**: CSS output separates utility CSS from theme variable CSS (`:root` block), preserving the `themeCss` field in `ConvertResult`
 
-### Theme Support
+### Regression
 
-- [ ] **THEME-01**: `convert()` accepts optional `themeCss: string` containing `@theme { ... }` CSS block
-- [ ] **THEME-02**: Parser extracts CSS variable declarations from `@theme` blocks, handling comments, duplicates (last wins), and malformed declarations (warn + skip)
-- [ ] **THEME-03**: Namespace mapper translates `--namespace-name: value` to UnoCSS theme config keys with a tested conformance matrix for preset-wind4@66.6.7
-- [ ] **THEME-04**: Theme config extends preset-wind4 defaults (not replaces) -- user's `--color-brand` adds to existing colors, doesn't remove red/blue/etc.
-- [ ] **THEME-05**: Generator cache key includes theme identity so different theme configs produce different generators
-- [ ] **THEME-06**: ConvertResult includes theme CSS (`:root` variable definitions) alongside utility CSS
-- [ ] **THEME-07**: Unknown namespaces are warned but passed through as custom theme keys (not silently dropped)
-- [ ] **THEME-08**: CLI accepts `--theme <file>` flag, reads CSS file, passes contents to library as `themeCss`
-- [ ] **THEME-09**: Per-namespace conformance table documented with status: direct preset mapping, vanillify-added, or unsupported
-- [ ] **THEME-10**: Calling `convert()` without `themeCss` produces identical output to v1.0 -- fully opt-in
+- [x] **REG-01**: Snapshot tests capture current `convert()` output for all existing fixtures before any engine changes
+- [ ] **REG-02**: Unmatched Tailwind classes produce `unmatched-class` warnings via CSS output inspection (replacing UnoCSS's `matched` set)
+- [ ] **REG-03**: All existing tests pass after engine swap with updated assertions for Tailwind's CSS output format
 
-## v1.2 Requirements
+### Rewriter
 
-### CSS Modules Output
+- [ ] **RWR-01**: Selector rewriting works correctly with Tailwind's native CSS output (nesting, media query range syntax, escaping)
+- [ ] **RWR-02**: Per-node CSS isolation produces correct output — each node's CSS contains only rules for that node's classes
+- [ ] **RWR-03**: `@layer` wrappers in Tailwind output are handled correctly (stripped or preserved as appropriate)
 
-- [ ] **MOD-01**: `convert()` accepts `outputFormat: 'vanilla' | 'css-modules'` option (default: `'vanilla'`)
-- [ ] **MOD-02**: When `outputFormat` is `'css-modules'`, component output uses `{styles.nodeN}` JSX expressions instead of `"nodeN"` string literals
-- [ ] **MOD-03**: When `outputFormat` is `'css-modules'`, component output includes `import styles from './filename.module.css'` statement inserted after existing imports
-- [ ] **MOD-04**: CSS output content is identical between vanilla and css-modules formats (only file extension and JSX references change)
-- [ ] **MOD-05**: CLI accepts `--format` / `-f` flag with values `vanilla` (default) and `css-modules`
-- [ ] **MOD-06**: CLI writes `.module.css` extension when format is `css-modules`, `.vanilla.css` when format is `vanilla`
-- [ ] **MOD-07**: Calling `convert()` without `outputFormat` produces identical output to current behavior (backward compatible)
-- [ ] **MOD-08**: Dynamic class expressions remain unchanged (with warnings) regardless of output format
+### Cleanup
 
-## v2 Requirements
+- [ ] **CLN-01**: `src/theme/` directory (parser.ts, mapper.ts, types.ts) is deleted — Tailwind handles `@theme` natively
+- [ ] **CLN-02**: `src/variants/` directory (parser.ts, resolver.ts, types.ts) is deleted — Tailwind handles `@custom-variant` natively
+- [ ] **CLN-03**: `@unocss/core` and `@unocss/preset-wind4` are removed from dependencies; `tailwindcss@~4.2.2` is added
+- [ ] **CLN-04**: All Tailwind imports are isolated to a single adapter file (`pipeline/generator.ts`)
 
-Deferred to future release. Tracked but not in current roadmap.
+### API Compatibility
+
+- [ ] **API-01**: `ConvertOptions` and `ConvertResult` types preserve their existing shape — engine swap is internal
+- [ ] **API-02**: `customVariants` accepts CSS string input and produces correct output via native Tailwind processing
+- [ ] **API-03**: `themeCss` accepts CSS string input (bare declarations or `@theme {}` blocks) and produces correct output
+- [ ] **API-04**: Calling `convert()` without options produces identical behavior to v1.x (fully backward compatible default path)
+
+## Future Requirements
+
+Deferred to future releases. Tracked but not in current roadmap.
+
+### Optimization
+
+- **OPT-01**: Single-pass `build()` with post-hoc CSS rule splitting for large files (>50 nodes)
+- **OPT-02**: Source map support via Tailwind's `buildSourceMap()`
+
+### Extensibility
+
+- **EXT-01**: JS plugin support via `loadModule` callback
+- **EXT-02**: Preflight/reset inclusion option
 
 ### Enhancements
 
@@ -73,13 +85,12 @@ Explicitly excluded. Documented to prevent scope creep.
 
 | Feature | Reason |
 |---------|--------|
-| `@theme { --*: initial }` (theme reset) | Requires full default theme knowledge to reconstruct |
-| `@theme inline { ... }` | No UnoCSS equivalent concept |
-| `@keyframes` inside `@theme` | UnoCSS handles animations via different mechanism |
-| Auto-discovery of `@theme` from project CSS | Breaks stateless API design; CLI handles file reading |
-| `var()` references inside `@theme` values | Requires resolution context not available statically |
-| Runtime/JIT conversion | Fundamentally different product -- vanillify is static/build-time |
-| Semantic class naming | Deferred to v2 (ENH-01, ENH-02) |
+| Source maps | Defer to v2.1 — not needed for core conversion |
+| JS plugin support via `loadModule` | No current use case |
+| Preflight/reset inclusion | Vanillify outputs utilities only |
+| Semantic class naming | Future — local AI model integration (ENH-01, ENH-02) |
+| `customVariants` as `Record<string, string>` | Dropped — CSS string is the only input format with native Tailwind |
+| Runtime/JIT conversion | Fundamentally different product — vanillify is static/build-time |
 
 ## Traceability
 
@@ -87,38 +98,31 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| TOOL-01 | Phase 4 | Pending |
-| TOOL-02 | Phase 4 | Pending |
-| TOOL-03 | Phase 4 | Pending |
-| TOOL-04 | Phase 4 | Pending |
-| TOOL-05 | Phase 4 | Pending |
-| QUAL-01 | Phase 5 | Pending |
-| QUAL-02 | Phase 5 | Pending |
-| THEME-01 | Phase 6 | Pending |
-| THEME-02 | Phase 6 | Pending |
-| THEME-03 | Phase 6 | Pending |
-| THEME-04 | Phase 6 | Pending |
-| THEME-05 | Phase 6 | Pending |
-| THEME-06 | Phase 6 | Pending |
-| THEME-07 | Phase 6 | Pending |
-| THEME-08 | Phase 6 | Pending |
-| THEME-09 | Phase 6 | Pending |
-| THEME-10 | Phase 6 | Pending |
-| MOD-01 | Phase 7 | Pending |
-| MOD-02 | Phase 7 | Pending |
-| MOD-03 | Phase 7 | Pending |
-| MOD-04 | Phase 7 | Pending |
-| MOD-05 | Phase 7 | Pending |
-| MOD-06 | Phase 7 | Pending |
-| MOD-07 | Phase 7 | Pending |
-| MOD-08 | Phase 7 | Pending |
+| ENG-01 | Phase 9 | Pending |
+| ENG-02 | Phase 9 | Pending |
+| ENG-03 | Phase 9 | Pending |
+| ENG-04 | Phase 9 | Pending |
+| ENG-05 | Phase 9 | Pending |
+| REG-01 | Phase 8 | Complete |
+| REG-02 | Phase 10 | Pending |
+| REG-03 | Phase 10 | Pending |
+| RWR-01 | Phase 10 | Pending |
+| RWR-02 | Phase 10 | Pending |
+| RWR-03 | Phase 10 | Pending |
+| CLN-01 | Phase 11 | Pending |
+| CLN-02 | Phase 11 | Pending |
+| CLN-03 | Phase 11 | Pending |
+| CLN-04 | Phase 11 | Pending |
+| API-01 | Phase 11 | Pending |
+| API-02 | Phase 11 | Pending |
+| API-03 | Phase 11 | Pending |
+| API-04 | Phase 11 | Pending |
 
 **Coverage:**
-- v1.1 requirements: 17 total
-- v1.2 requirements: 8 total
-- Mapped to phases: 25
+- v2.0 requirements: 19 total
+- Mapped to phases: 19
 - Unmapped: 0
 
 ---
 *Requirements defined: 2026-04-05*
-*Last updated: 2026-04-05 after Phase 7 planning*
+*Last updated: 2026-04-05 after v2.0 roadmap creation*

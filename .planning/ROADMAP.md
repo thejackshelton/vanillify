@@ -3,7 +3,8 @@
 ## Milestones
 
 - v1.0 MVP - Phases 1-3 (shipped 2026-04-05)
-- v1.1 Toolchain & Theme Support - Phases 4-6 (in progress)
+- v1.1 Toolchain & Theme Support - Phases 4-7 (shipped)
+- v2.0 Tailwind Compile Migration - Phases 8-11 (in progress)
 
 ## Phases
 
@@ -73,15 +74,8 @@ Plans:
 
 </details>
 
-### v1.1 Toolchain & Theme Support (In Progress)
-
-**Milestone Goal:** Modernize the build toolchain to vite-plus, adopt magic-regexp for all pattern matching, and add Tailwind v4 `@theme` block support.
-
-- [ ] **Phase 4: Toolchain Foundation** - Migrate to pnpm and unify build/test/lint/fmt config under vite-plus
-- [ ] **Phase 5: Code Quality** - Replace static regex patterns with magic-regexp for readability and type safety
-- [ ] **Phase 6: Theme Support** - Parse Tailwind v4 @theme blocks, map to UnoCSS theme config, expose via API and CLI
-
-## Phase Details
+<details>
+<summary>v1.1 Toolchain & Theme Support (Phases 4-7) - SHIPPED</summary>
 
 ### Phase 4: Toolchain Foundation
 **Goal**: The project builds, tests, lints, and formats through a single vite-plus config with pnpm as package manager
@@ -93,10 +87,10 @@ Plans:
   3. `vp pack` produces identical dist/ output (same entry points, same exports, same file structure) as the previous `tsdown` build
   4. `vp test` discovers and passes all existing tests with zero behavior change
   5. `vp lint` and `vp fmt` run successfully with project rules configured
-**Plans:** 3 plans
+**Plans:** 3/3 plans complete
 
 Plans:
-- [ ] 04-01-PLAN.md -- Migrate to pnpm and snapshot dist/ baseline
+- [x] 04-01-PLAN.md -- Migrate to pnpm and snapshot dist/ baseline
 - [x] 04-02-PLAN.md -- Unified vite-plus config, test import rewrite, build parity verification
 - [x] 04-03-PLAN.md -- Lint and fmt configuration with oxlint and oxfmt
 
@@ -108,7 +102,7 @@ Plans:
   1. Every static regex pattern (variant parser, generator layer regex, CLI extension matching, and others) uses magic-regexp -- no raw `/pattern/` literals remain for static patterns
   2. Dynamic regex patterns in rewriter.ts have explicit code comments explaining why they remain as raw RegExp (runtime construction incompatible with magic-regexp)
   3. All existing tests pass with zero behavior change after the regex migration
-**Plans:** 2 plans
+**Plans:** 2/2 plans complete
 
 Plans:
 - [x] 05-01-PLAN.md -- Install magic-regexp, configure transform plugin, convert simple patterns
@@ -124,14 +118,14 @@ Plans:
   3. Sequential calls with different `themeCss` values produce different CSS output (generator cache correctly invalidated by theme identity)
   4. `npx vanillify --theme theme.css src/**/*.tsx` reads the CSS file and passes theme to the conversion pipeline, producing theme-aware output
   5. Calling `convert()` without `themeCss` produces identical output to v1.0 -- the feature is fully opt-in with zero regression
-**Plans:** 3 plans
+**Plans:** 3/3 plans complete
 
 Plans:
 - [x] 06-01-PLAN.md -- Theme types, @theme CSS parser, and namespace mapper (TDD)
 - [x] 06-02-PLAN.md -- Generator theme config, pipeline wiring, and integration tests (TDD)
 - [x] 06-03-PLAN.md -- CLI --theme flag and end-to-end verification
 
-### Phase 7: Add CSS Modules Output Support
+### Phase 7: CSS Modules Output
 **Goal**: Users can choose CSS Modules as an output format via `convert()` option or `--format css-modules` CLI flag, producing `styles.nodeN` JSX expressions with import statements and `.module.css` file extensions
 **Depends on**: Phase 6
 **Requirements**: MOD-01, MOD-02, MOD-03, MOD-04, MOD-05, MOD-06, MOD-07, MOD-08
@@ -141,23 +135,89 @@ Plans:
   3. `npx vanillify --format css-modules src/**/*.tsx` writes `.module.css` files instead of `.vanilla.css`
   4. Calling `convert()` without `outputFormat` produces identical output to current behavior (fully backward compatible)
   5. Dynamic class expressions remain unchanged regardless of output format
-**Plans:** 2 plans
+**Plans:** 2/2 plans complete
 
 Plans:
-- [ ] 07-01-PLAN.md -- OutputFormat types, format-aware rewriter, convert() threading (TDD)
-- [ ] 07-02-PLAN.md -- CLI --format flag and CLAUDE.md constraint update
+- [x] 07-01-PLAN.md -- OutputFormat types, format-aware rewriter, convert() threading (TDD)
+- [x] 07-02-PLAN.md -- CLI --format flag and CLAUDE.md constraint update
+
+</details>
+
+### v2.0 Tailwind Compile Migration (In Progress)
+
+**Milestone Goal:** Replace UnoCSS engine with Tailwind v4's native `compile().build()` API, delete custom translation layers, and simplify the codebase while preserving the public API.
+
+- [ ] **Phase 8: Regression Test Baseline** - Snapshot current convert() output for all fixtures before any engine changes
+- [ ] **Phase 9: Tailwind Adapter Module** - Build compile().build() integration with loadStylesheet, caching, and CSS layer separation
+- [ ] **Phase 10: Pipeline Wiring and Rewriter Adaptation** - Wire adapter into pipeline, adapt rewriter to Tailwind CSS output, verify regression parity
+- [ ] **Phase 11: Cleanup and API Verification** - Delete theme/variant translation layers, remove UnoCSS deps, verify public API backward compatibility
+
+## Phase Details
+
+### Phase 8: Regression Test Baseline
+**Goal**: Every existing conversion behavior is captured in snapshot tests so engine changes in subsequent phases have a safety net
+**Depends on**: Phase 7 (v1.1 complete)
+**Requirements**: REG-01
+**Success Criteria** (what must be TRUE):
+  1. Snapshot tests exist for every existing fixture covering standard utilities, variants, arbitrary values, theme input, and custom variants
+  2. Running the snapshot tests against the current (UnoCSS) engine produces zero failures -- the baseline is clean
+  3. Unmatched class warning behavior is captured in at least one snapshot test
+**Plans:** 1 plan
+
+Plans:
+- [x] 08-01-PLAN.md -- Comprehensive regression snapshot tests for all conversion paths
+
+### Phase 9: Tailwind Adapter Module
+**Goal**: A new generator module produces correct CSS from Tailwind's compile().build() API, tested in isolation against known inputs
+**Depends on**: Phase 8
+**Requirements**: ENG-01, ENG-02, ENG-03, ENG-04, ENG-05
+**Success Criteria** (what must be TRUE):
+  1. A Tailwind adapter function accepts candidate class names and returns generated CSS using compile().build() -- not UnoCSS
+  2. The adapter resolves `@import "tailwindcss"` via a loadStylesheet callback without touching the filesystem
+  3. `source(none)` prevents Tailwind from scanning files -- only oxc-parser-extracted candidates are processed
+  4. Repeated calls with identical CSS input reuse a cached compiler instance (verified by test spy or timing)
+  5. CSS output cleanly separates utility rules from `:root` theme variables, preserving the `themeCss` field shape
+**Plans**: TBD
+
+### Phase 10: Pipeline Wiring and Rewriter Adaptation
+**Goal**: End-to-end conversion works through the Tailwind engine with the rewriter producing correct output for Tailwind's CSS format
+**Depends on**: Phase 9
+**Requirements**: RWR-01, RWR-02, RWR-03, REG-02, REG-03
+**Success Criteria** (what must be TRUE):
+  1. `convert()` produces correct output end-to-end using the Tailwind engine for all existing fixture files
+  2. Selector rewriting handles Tailwind-specific CSS patterns: nesting syntax, `width >= 640px` media queries, and escaped selectors for arbitrary values
+  3. Per-node CSS isolation is correct -- each node's CSS block contains only rules for that node's classes, no cross-contamination
+  4. Unmatched Tailwind classes produce warnings via CSS output inspection (replacing the UnoCSS `matched` set approach)
+  5. All existing tests pass with updated assertions reflecting Tailwind's CSS output format differences
+**Plans**: TBD
+
+### Phase 11: Cleanup and API Verification
+**Goal**: The codebase contains no UnoCSS code or dependencies, all Tailwind imports are isolated to one adapter file, and the public API is fully backward compatible
+**Depends on**: Phase 10
+**Requirements**: CLN-01, CLN-02, CLN-03, CLN-04, API-01, API-02, API-03, API-04
+**Success Criteria** (what must be TRUE):
+  1. `src/theme/` and `src/variants/` directories are deleted -- Tailwind handles both natively
+  2. `@unocss/core` and `@unocss/preset-wind4` are removed from package.json; `tailwindcss@~4.2.2` is the only CSS engine dependency
+  3. All Tailwind imports exist in exactly one file (`pipeline/generator.ts`) -- no other source file imports from `tailwindcss`
+  4. `convert()` called without options produces identical behavior to v1.x -- the default path is fully backward compatible
+  5. `convert()` with `customVariants` (CSS string) and `themeCss` (CSS string or `@theme {}` block) produces correct output via native Tailwind processing
+**Plans**: TBD
 
 ## Progress
 
 **Execution Order:**
-Phases execute in numeric order: 4 -> 5 -> 6 -> 7
+Phases execute in numeric order: 8 -> 9 -> 10 -> 11
 
 | Phase | Milestone | Plans Complete | Status | Completed |
 |-------|-----------|----------------|--------|-----------|
 | 1. Core Pipeline | v1.0 | 4/4 | Complete | 2026-04-05 |
 | 2. Custom Variant Resolution | v1.0 | 2/2 | Complete | 2026-04-05 |
 | 3. CLI and Package | v1.0 | 2/2 | Complete | 2026-04-05 |
-| 4. Toolchain Foundation | v1.1 | 0/3 | Not started | - |
-| 5. Code Quality | v1.1 | 0/2 | Not started | - |
-| 6. Theme Support | v1.1 | 0/3 | Not started | - |
-| 7. CSS Modules Output | v1.2 | 0/2 | Not started | - |
+| 4. Toolchain Foundation | v1.1 | 3/3 | Complete | 2026-04-05 |
+| 5. Code Quality | v1.1 | 2/2 | Complete | 2026-04-05 |
+| 6. Theme Support | v1.1 | 3/3 | Complete | 2026-04-05 |
+| 7. CSS Modules Output | v1.1 | 2/2 | Complete | 2026-04-05 |
+| 8. Regression Test Baseline | v2.0 | 0/1 | In progress | - |
+| 9. Tailwind Adapter Module | v2.0 | 0/0 | Not started | - |
+| 10. Pipeline Wiring and Rewriter Adaptation | v2.0 | 0/0 | Not started | - |
+| 11. Cleanup and API Verification | v2.0 | 0/0 | Not started | - |
