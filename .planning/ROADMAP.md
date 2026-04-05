@@ -28,7 +28,14 @@ Decimal phases appear between their surrounding integers in numeric order.
   3. Pseudo-class variants (hover:, focus:, active:, disabled:) produce correct CSS pseudo-selectors; responsive variants (sm:, md:, lg:) produce correct @media rules; stacked variants (dark:hover:) resolve correctly
   4. Dynamic class expressions (ternaries, template literals, clsx) are detected and emit a warning — they are never silently skipped
   5. Arbitrary Tailwind values (text-[#ff0000], w-[calc(100%-1rem)]) produce correct CSS output
-**Plans**: TBD
+**Plans:** 4 plans
+
+Plans:
+- [ ] 01-01-PLAN.md — Project scaffolding, type definitions, and parser module
+- [ ] 01-02-PLAN.md — AST class extractor with dynamic expression detection
+- [ ] 01-03-PLAN.md — UnoCSS generator singleton and indexed namer module
+- [ ] 01-04-PLAN.md — Rewriter module, convert() API wiring, and integration tests
+
 **UI hint**: no
 
 ### Phase 2: Custom Variant Resolution
@@ -60,6 +67,6 @@ Phases execute in numeric order: 1 → 2 → 3
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. Core Pipeline | 0/TBD | Not started | - |
+| 1. Core Pipeline | 0/4 | Planning complete | - |
 | 2. Custom Variant Resolution | 0/TBD | Not started | - |
 | 3. CLI and Package | 0/TBD | Not started | - |
