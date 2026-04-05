@@ -1,14 +1,12 @@
-import { charIn, createRegExp, global } from "magic-regexp";
-import type { VariantObject } from "@unocss/core";
+import { createRegExp, exactly, maybe } from "magic-regexp";
 import type { NodeEntry, OutputFormat, Warning } from "../types";
 import type { NameMap } from "./namer";
-import { generateCSS } from "./generator";
+import { twGenerateCSS } from "./generator";
 
-/** Matches regex metacharacters for escaping in dynamically-built patterns */
-const REGEX_META_RE = createRegExp(charIn(".*+?^${}()|[]\\"), [global]);
-
-/** Matches CSS selector special characters that UnoCSS escapes */
-const CSS_SELECTOR_RE = createRegExp(charIn("[]#()/:,.%@!").grouped(), [global]);
+/** Matches .ts, .tsx, .js, .jsx file extensions at end of string */
+const FILE_EXT_RE = createRegExp(
+  exactly(".").and(exactly("ts").or(exactly("js"))).and(maybe(exactly("x"))).at.lineEnd(),
+);
 
 export interface RewriteResult {
   /** Source with className values replaced by indexed names */
@@ -27,9 +25,11 @@ export interface RewriteResult {
  * Rewrite the source component and assemble per-node CSS.
  *
  * For each static entry:
- * 1. Generate CSS for that node's tokens individually
- * 2. Replace UnoCSS-generated selectors with .nodeN
- * 3. Replace the className value in the source with "nodeN"
+ * 1. Generate CSS for that node's tokens via Tailwind's compile().build()
+ * 2. Replace Tailwind-generated top-level selectors with .nodeN
+ * 3. Merge plain declarations into a single .nodeN {} block
+ * 4. Preserve nested content (variants, media queries) as separate .nodeN {} blocks
+ * 5. Replace the className value in the source with "nodeN"
  *
  * Dynamic entries are left unchanged in the source.
  * Replacements applied in reverse source order to avoid offset drift.
@@ -38,6 +38,9 @@ export interface RewriteResult {
  * @param entries - NodeEntry[] from extractor
  * @param nameMap - NameMap from namer
  * @param extractWarnings - Warnings from extraction phase
+ * @param css - Optional CSS string with @custom-variant and/or @theme directives
+ * @param outputFormat - Output format ('vanilla' or 'css-modules')
+ * @param filename - Original filename for CSS Modules import path
  * @returns RewriteResult with transformed component, CSS, and all warnings
  */
 export async function rewrite(
@@ -45,14 +48,14 @@ export async function rewrite(
   entries: NodeEntry[],
   nameMap: NameMap,
   extractWarnings: Warning[],
-  customVariants?: VariantObject[],
-  themeConfig?: Record<string, any>,
+  css?: string,
   outputFormat?: OutputFormat,
   filename?: string,
 ): Promise<RewriteResult> {
   const allWarnings: Warning[] = [...extractWarnings];
   const cssBlocks: string[] = [];
-  let themeCss = "";
+  let resultThemeCss = "";
+  let resultSupportCss = "";
 
   // Generate CSS per-node to get isolated CSS blocks
   for (const entry of entries) {
@@ -61,19 +64,22 @@ export async function rewrite(
     if (!name) continue;
 
     const tokens = new Set(entry.classNames);
-    const result = await generateCSS(tokens, customVariants, themeConfig);
+    const result = await twGenerateCSS(tokens, css);
 
     // Collect unmatched warnings
     allWarnings.push(...result.warnings);
 
-    // Collect themeCss from the first generateCSS call that returns non-empty themeCss
-    // (theme layer is the same across all nodes since it comes from the generator's theme config)
-    if (!themeCss && result.themeCss) {
-      themeCss = result.themeCss;
+    // Collect themeCss and supportCss from the first call that returns non-empty values
+    // (these are the same across all nodes since they come from the compiler config)
+    if (!resultThemeCss && result.themeCss) {
+      resultThemeCss = result.themeCss;
+    }
+    if (!resultSupportCss && result.supportCss) {
+      resultSupportCss = result.supportCss;
     }
 
-    // Extract only the utility rules from the default layer and rewrite selectors
-    const nodeCSS = buildNodeCSS(name, result.css, entry.classNames);
+    // Rewrite top-level selectors to .nodeN and merge plain declarations
+    const nodeCSS = buildNodeCSS(name, result.css);
     if (nodeCSS.trim()) {
       cssBlocks.push(nodeCSS);
     }
@@ -112,9 +118,14 @@ export async function rewrite(
     }
   }
 
-  const css = cssBlocks.join("\n\n");
+  // Combine: per-node utility CSS blocks + support CSS (hoisted once per file)
+  // Support CSS includes @property, @keyframes, @layer properties — needed for
+  // animation utilities, content-['x'], space-x-4, etc. to work correctly.
+  const parts = [cssBlocks.join("\n\n")];
+  if (resultSupportCss) parts.push(resultSupportCss);
+  const outputCss = parts.filter(Boolean).join("\n\n");
 
-  return { component, css, themeCss, warnings: allWarnings, classMap };
+  return { component, css: outputCss, themeCss: resultThemeCss, warnings: allWarnings, classMap };
 }
 
 /**
@@ -122,7 +133,7 @@ export async function rewrite(
  * Placed after the last existing import statement, or at the top if none exist.
  */
 function prependModuleImport(source: string, filename: string): string {
-  const baseName = filename.replace(/\.(tsx?|jsx?)$/, '');
+  const baseName = filename.replace(FILE_EXT_RE, '');
   const importPath = './' + baseName + '.module.css';
   const importLine = `import styles from '${importPath}';`;
 
@@ -141,307 +152,183 @@ function prependModuleImport(source: string, filename: string): string {
   return lines.join('\n');
 }
 
+// --- Tailwind CSS block splitting and rewriting ---
+
 /**
- * Extract the utility CSS section (after "layer: default" comment) from UnoCSS output.
- * UnoCSS output contains multiple layer sections; we only need the "default" layer
- * which contains the actual utility rules.
+ * Split Tailwind's CSS output into top-level blocks.
+ *
+ * Each top-level block starts with a selector at brace depth 0 and ends
+ * when the brace depth returns to 0. Handles nested CSS (variants, media
+ * queries inside rules).
+ *
+ * @param css - Raw utility CSS from twGenerateCSS (no @layer wrappers)
+ * @returns Array of complete top-level block strings
  */
-function extractDefaultLayer(rawCSS: string): string {
-  const marker = "/* layer: default */";
-  const idx = rawCSS.indexOf(marker);
-  if (idx === -1) return rawCSS; // Fallback: return everything
-  return rawCSS.slice(idx + marker.length).trim();
+function splitTopLevelBlocks(css: string): string[] {
+  const blocks: string[] = [];
+  let depth = 0;
+  let blockStart = -1;
+
+  for (let i = 0; i < css.length; i++) {
+    const ch = css[i];
+
+    if (depth === 0 && blockStart === -1) {
+      // Skip whitespace between blocks
+      if (ch === '.' || ch === '@') {
+        blockStart = i;
+      }
+    }
+
+    if (ch === '{') depth++;
+    if (ch === '}') {
+      depth--;
+      if (depth === 0 && blockStart !== -1) {
+        blocks.push(css.slice(blockStart, i + 1).trim());
+        blockStart = -1;
+      }
+    }
+  }
+
+  return blocks;
 }
 
 /**
- * Escape a string for use in a regular expression.
+ * Replace the top-level selector in a CSS block with a new selector.
+ *
+ * Given `.hover\:bg-blue-700 { &:hover { ... } }`, replaces
+ * `.hover\:bg-blue-700` with `.node0` while preserving inner content.
+ *
+ * @param block - Complete CSS block string
+ * @param newSelector - New selector (e.g., `.node0`)
+ * @returns Block with replaced selector
  */
-function escapeRegex(str: string): string {
-  return str.replace(REGEX_META_RE, "\\$&");
+function replaceTopLevelSelector(block: string, newSelector: string): string {
+  const firstBrace = block.indexOf('{');
+  if (firstBrace === -1) return block;
+
+  return newSelector + ' ' + block.slice(firstBrace);
 }
 
 /**
- * Build the CSS selector pattern that UnoCSS generates for a given class name.
- * UnoCSS escapes special characters like [], #, :, / in selectors.
- * For example: "text-[#ff0000]" becomes ".text-\[\#ff0000\]" in CSS.
+ * Check whether a CSS block contains nested rules (variant selectors,
+ * media queries, etc.) inside its outer braces.
+ *
+ * A "plain" block has only property: value declarations inside.
+ * A "nested" block contains additional { } pairs (e.g., &:hover { ... }).
+ *
+ * @param block - CSS block with selector replaced
+ * @returns true if the block contains nested content
  */
-function buildSelectorPattern(className: string): string {
-  // UnoCSS escapes these characters in CSS selectors: [ ] # ( ) / : , . % @ !
-  const escaped = className.replace(CSS_SELECTOR_RE, "\\$1");
-  return escaped;
+function hasNestedContent(block: string): boolean {
+  const firstBrace = block.indexOf('{');
+  if (firstBrace === -1) return false;
+
+  // Look for another { inside the block (after the first opening brace)
+  const inner = block.slice(firstBrace + 1);
+  return inner.indexOf('{') !== -1;
 }
 
 /**
- * Transform UnoCSS-generated CSS to use .nodeN selectors.
+ * Extract the inner declarations from a plain (non-nested) CSS block.
+ *
+ * Given `.node0 { display: flex; padding: 1rem; }`, returns:
+ * `  display: flex;\n  padding: 1rem;`
+ *
+ * Strips leading indentation inherited from Tailwind's @layer extraction.
+ *
+ * @param block - Plain CSS block (no nested content)
+ * @returns Formatted declarations with 2-space indent
+ */
+function extractInnerDeclarations(block: string): string {
+  const firstBrace = block.indexOf('{');
+  const lastBrace = block.lastIndexOf('}');
+  if (firstBrace === -1 || lastBrace === -1) return '';
+
+  const inner = block.slice(firstBrace + 1, lastBrace).trim();
+
+  return inner
+    .split(';')
+    .map((d) => d.trim())
+    .filter(Boolean)
+    .map((d) => `  ${d};`)
+    .join('\n');
+}
+
+/**
+ * Strip leading indentation from Tailwind's utility CSS output.
+ *
+ * Tailwind's `extractLayers()` preserves 2-space indentation from the
+ * `@layer utilities { ... }` wrapper. Strip it for clean output.
+ *
+ * @param css - CSS string with potential leading indentation
+ * @returns CSS with leading indentation stripped from each line
+ */
+function stripLeadingIndent(css: string): string {
+  // Find the minimum non-zero indentation
+  const lines = css.split('\n');
+  let minIndent = Infinity;
+  for (const line of lines) {
+    if (line.trim().length === 0) continue;
+    const indent = line.length - line.trimStart().length;
+    if (indent > 0 && indent < minIndent) minIndent = indent;
+  }
+
+  if (minIndent === Infinity || minIndent === 0) return css;
+
+  return lines
+    .map((line) => {
+      if (line.trim().length === 0) return '';
+      const currentIndent = line.length - line.trimStart().length;
+      if (currentIndent >= minIndent) {
+        return line.slice(minIndent);
+      }
+      return line;
+    })
+    .join('\n');
+}
+
+/**
+ * Build CSS for a single node from Tailwind's utility CSS output.
  *
  * Strategy:
- * 1. Extract the "default" layer CSS (utility rules only)
- * 2. Build a regex that matches any UnoCSS-generated utility selector
- * 3. Replace those selectors with .nodeN, merging plain rules
+ * 1. Strip leading indentation from Tailwind output
+ * 2. Split into top-level blocks (one per utility class)
+ * 3. Replace each block's selector with .nodeN
+ * 4. Merge plain (non-nested) declarations into one .nodeN { ... } block
+ * 5. Keep nested blocks (variants, media queries) as separate .nodeN { ... } blocks
  *
- * For plain rules: .utility { props } -> .nodeN { props }
- * For @media/@supports rules: keep wrapper, replace inner selectors
- * For pseudo rules: .utility:hover { props } -> .nodeN:hover { props }
- *
- * Since UnoCSS generates one rule per utility, we merge plain declarations
- * under a single .nodeN { ... } block.
+ * @param nodeName - Indexed node name (e.g., "node0")
+ * @param utilityCss - Raw utility CSS from twGenerateCSS
+ * @returns Rewritten CSS with .nodeN selectors
  */
-function buildNodeCSS(nodeName: string, rawCSS: string, classNames: string[]): string {
-  const utilityCSS = extractDefaultLayer(rawCSS);
-  if (!utilityCSS) return "";
+function buildNodeCSS(nodeName: string, utilityCss: string): string {
+  if (!utilityCss.trim()) return "";
 
   const selector = `.${nodeName}`;
+  const stripped = stripLeadingIndent(utilityCss);
+  const blocks = splitTopLevelBlocks(stripped);
 
-  // Build a regex pattern matching any of the utility selectors generated by UnoCSS
-  // UnoCSS prefixes variant names: e.g., hover:bg-blue-700 becomes .hover\:bg-blue-700:hover
-  // We need to match the full selector up to (but not including) any pseudo-class that follows
-  const selectorPatterns = classNames.map((cn) => {
-    const escaped = buildSelectorPattern(cn);
-    // Match the escaped version with variant prefix if present
-    // UnoCSS generates e.g. .hover\:bg-blue-700:hover or .sm\:grid
-    return escapeRegex(".") + escaped;
-  });
-
-  // Also match variant-prefixed forms: .hover\:className
-  const variantPrefixPatterns = classNames.map((cn) => {
-    const escaped = buildSelectorPattern(cn);
-    // Match any variant prefix: .{variant}\:{className}
-    return escapeRegex(".") + "[a-zA-Z0-9-]+\\\\:" + escaped;
-  });
-
-  const allPatterns = [...selectorPatterns, ...variantPrefixPatterns];
-
-  // Parse line by line, tracking brace depth for nested blocks
-  const lines = utilityCSS.split("\n");
   const plainDeclarations: string[] = [];
-  const specialBlocks: string[] = [];
+  const nestedBlocks: string[] = [];
 
-  let i = 0;
-  while (i < lines.length) {
-    const line = lines[i].trim();
-
-    // Skip empty lines
-    if (!line) {
-      i++;
-      continue;
-    }
-
-    // @supports or @media block
-    if (line.startsWith("@media") || line.startsWith("@supports")) {
-      const block = collectBlock(lines, i);
-      const rewritten = rewriteSelectorsInBlock(block, allPatterns, selector);
-      if (rewritten.trim()) {
-        specialBlocks.push(rewritten);
+  for (const block of blocks) {
+    const replaced = replaceTopLevelSelector(block, selector);
+    if (hasNestedContent(replaced)) {
+      nestedBlocks.push(replaced);
+    } else {
+      // Extract declarations for merging into a single block
+      const decls = extractInnerDeclarations(replaced);
+      if (decls) {
+        plainDeclarations.push(decls);
       }
-      i += countBlockLines(lines, i);
-      continue;
     }
-
-    // Regular rule starting with . (utility class)
-    if (line.startsWith(".") && line.includes("{")) {
-      const block = collectBlock(lines, i);
-      const blockLines = countBlockLines(lines, i);
-
-      // Check if this is a matching utility selector
-      if (matchesAnyPattern(line, allPatterns)) {
-        // Extract the pseudo-class suffix if present (e.g., :hover, :focus, etc.)
-        const pseudoMatch = extractPseudo(line);
-        const declarations = extractDeclarations(block);
-
-        if (pseudoMatch) {
-          // Pseudo-selector rule: .utility:hover { ... } -> .nodeN:hover { ... }
-          specialBlocks.push(`${selector}${pseudoMatch} {\n${declarations}\n}`);
-        } else {
-          // Plain rule -- collect declarations for merging
-          plainDeclarations.push(declarations);
-        }
-      }
-
-      i += blockLines;
-      continue;
-    }
-
-    i++;
   }
 
   const parts: string[] = [];
   if (plainDeclarations.length > 0) {
-    parts.push(`${selector} {\n${plainDeclarations.join("\n")}\n}`);
+    parts.push(`${selector} {\n${plainDeclarations.join('\n')}\n}`);
   }
-  parts.push(...specialBlocks);
+  parts.push(...nestedBlocks);
 
-  return parts.join("\n\n");
-}
-
-/**
- * Check if a CSS rule line matches any of our utility selector patterns.
- */
-function matchesAnyPattern(line: string, patterns: string[]): boolean {
-  for (const pattern of patterns) {
-    try {
-      // INTENTIONALLY RAW: pattern is constructed dynamically at runtime from user class names;
-      // magic-regexp requires static string literals and cannot handle runtime concatenation
-      const re = new RegExp(pattern + "(?:[:{\\s]|$)");
-      if (re.test(line)) return true;
-    } catch {
-      // INTENTIONALLY RAW: fallback string replacement for escaped backslashes
-      if (line.includes(pattern.replace(/\\\\/g, "\\"))) return true;
-    }
-  }
-  return true; // Default: include unmatched rules — per-node CSS isolation prevents false positives
-}
-
-/**
- * Extract selector suffix from a CSS selector line.
- * Handles both pseudo-class suffixes and attribute selector suffixes.
- *
- * E.g., ".hover\:bg-blue-700:hover {" -> ":hover"
- * E.g., ".ui-checked\:bg-green-500[ui-checked] {" -> "[ui-checked]"
- * Returns null if no suffix found.
- *
- * UnoCSS escapes colons in class names with backslash (\:).
- * Real pseudo-classes have a bare colon (not preceded by backslash).
- * Attribute selectors start with [ not preceded by backslash.
- * We scan the selector portion (before {) for the first unescaped suffix.
- */
-function extractPseudo(line: string): string | null {
-  // Get the selector part (before the opening brace)
-  const braceIdx = line.indexOf("{");
-  const selectorPart = braceIdx > -1 ? line.slice(0, braceIdx).trim() : line.trim();
-
-  // Find the first unescaped colon or unescaped opening bracket
-  // Walk character by character
-  let suffixStart = -1;
-  for (let i = 1; i < selectorPart.length; i++) {
-    const ch = selectorPart[i];
-    const prev = selectorPart[i - 1];
-    if ((ch === ":" || ch === "[") && prev !== "\\") {
-      suffixStart = i;
-      break;
-    }
-  }
-
-  if (suffixStart === -1) return null;
-
-  // Everything from the first unescaped suffix character to end of selector
-  const suffix = selectorPart.slice(suffixStart);
-  return suffix || null;
-}
-
-/**
- * Collect a complete CSS block starting from a given line index.
- * Tracks brace nesting to handle nested blocks (e.g., @media { .rule { } }).
- * Returns the complete block as a single string.
- */
-function collectBlock(lines: string[], startIndex: number): string {
-  let depth = 0;
-  const blockLines: string[] = [];
-
-  for (let i = startIndex; i < lines.length; i++) {
-    const line = lines[i];
-    blockLines.push(line);
-
-    for (const ch of line) {
-      if (ch === "{") depth++;
-      if (ch === "}") depth--;
-    }
-
-    if (depth <= 0 && blockLines.length > 0) break;
-  }
-
-  return blockLines.join("\n");
-}
-
-/**
- * Count how many lines a block starting at startIndex spans.
- */
-function countBlockLines(lines: string[], startIndex: number): number {
-  let depth = 0;
-
-  for (let i = startIndex; i < lines.length; i++) {
-    const line = lines[i];
-
-    for (const ch of line) {
-      if (ch === "{") depth++;
-      if (ch === "}") depth--;
-    }
-
-    if (depth <= 0) return i - startIndex + 1;
-  }
-
-  return lines.length - startIndex;
-}
-
-/**
- * Extract the CSS declarations from a rule block (content between { and }).
- */
-function extractDeclarations(block: string): string {
-  const firstBrace = block.indexOf("{");
-  const lastBrace = block.lastIndexOf("}");
-  if (firstBrace === -1 || lastBrace === -1) return block;
-
-  const inner = block.slice(firstBrace + 1, lastBrace).trim();
-
-  // For single-line rules like ".flex{display:flex;}" format as indented
-  return inner
-    .split(";")
-    .map((d) => d.trim())
-    .filter(Boolean)
-    .map((d) => `  ${d};`)
-    .join("\n");
-}
-
-/**
- * Rewrite selectors inside an @media or @supports block.
- * Replaces utility class selectors with the node selector.
- */
-function rewriteSelectorsInBlock(block: string, patterns: string[], selector: string): string {
-  const lines = block.split("\n");
-  if (lines.length === 0) return "";
-
-  // First line is the @media/@supports declaration
-  const wrapper = lines[0].trim();
-  const result: string[] = [wrapper];
-
-  // Process inner rules
-  let i = 0;
-  const innerLines = lines.slice(1);
-  const innerDeclarations: string[] = [];
-
-  while (i < innerLines.length) {
-    const line = innerLines[i].trim();
-
-    if (line.startsWith(".") && line.includes("{")) {
-      // Inner rule
-      const innerBlock = collectBlock(innerLines, i);
-      const blockLineCount = countBlockLines(innerLines, i);
-
-      if (matchesAnyPattern(line, patterns)) {
-        const pseudo = extractPseudo(line);
-        const declarations = extractDeclarations(innerBlock);
-
-        if (pseudo) {
-          result.push(`${selector}${pseudo} {\n${declarations}\n}`);
-        } else {
-          innerDeclarations.push(declarations);
-        }
-      }
-
-      i += blockLineCount;
-      continue;
-    }
-
-    // Closing brace of the wrapper
-    if (line === "}") break;
-
-    i++;
-  }
-
-  if (innerDeclarations.length > 0) {
-    result.push(`${selector} {\n${innerDeclarations.join("\n")}\n}`);
-  }
-
-  result.push("}");
-
-  return result.join("\n");
+  return parts.join('\n\n');
 }

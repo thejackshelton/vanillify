@@ -1,0 +1,4 @@
+.node0 {
+  background-color: var(--color-brand);
+  padding: calc(var(--spacing) * 4);
+}

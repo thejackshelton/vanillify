@@ -1,0 +1,9 @@
+.node0 {
+  background-color: var(--color-blue-500);
+}
+
+.node0 {
+  &[ui-checked] {
+    background-color: var(--color-green-500);
+  }
+}

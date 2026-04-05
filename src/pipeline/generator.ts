@@ -1,80 +1,146 @@
-import {
-  anyOf,
-  createRegExp,
-  exactly,
-  global,
-  oneOrMore,
-  whitespace,
-  wordChar,
-} from "magic-regexp";
-import { createGenerator } from "@unocss/core";
-import type { VariantObject } from "@unocss/core";
-import presetWind4 from "@unocss/preset-wind4";
+import { compile } from "tailwindcss";
 import type { Warning } from "../types";
 
-/** Matches @layer wrapper declarations for stripping */
-const LAYER_RE = createRegExp(
-  exactly("@layer")
-    .and(oneOrMore(whitespace))
-    .and(oneOrMore(anyOf(wordChar, exactly("-"))))
-    .and(whitespace.times.any())
-    .and(exactly("{")),
-  [global],
-);
+// --- Virtual stylesheet resolution ---
+// Read CSS content once at module load (not per-call) [ENG-02]
+import { createRequire } from "module";
+import { readFileSync } from "fs";
+import { dirname, resolve } from "path";
 
-// Generator cache keyed by sorted variant names + theme identity -- prevents unbounded growth (T-02-04, T-06-06)
-const _cache = new Map<string, Awaited<ReturnType<typeof createGenerator>>>();
+const _require = createRequire(import.meta.url);
+const twDir = dirname(_require.resolve("tailwindcss/package.json"));
+const tailwindIndexCss = readFileSync(resolve(twDir, "index.css"), "utf-8");
 
-/**
- * Simple djb2 hash for cache key differentiation.
- * O(n) string hash -- no crypto overhead (T-06-06).
- */
-function simpleHash(str: string): string {
-  let hash = 5381;
-  for (let i = 0; i < str.length; i++) {
-    hash = ((hash << 5) + hash + str.charCodeAt(i)) | 0;
+async function loadStylesheet(id: string, base: string) {
+  if (id === "tailwindcss") {
+    return {
+      path: "virtual:tailwindcss/index.css",
+      base,
+      content: tailwindIndexCss,
+    };
   }
-  return (hash >>> 0).toString(36);
+  // T-09-03: bounded error message, no filesystem path leak
+  throw new Error(`Vanillify: cannot resolve stylesheet "${id}"`);
 }
 
-/**
- * Get or create a UnoCSS generator with preset-wind4 and optional custom variants/theme.
- * Generators are cached by variant config identity (sorted variant names) + theme hash.
- *
- * @param customVariants - Optional array of UnoCSS VariantObject entries
- * @param themeConfig - Optional UnoCSS theme config object (deep-merged with preset defaults)
- */
-export async function getGenerator(
-  customVariants?: VariantObject[],
-  themeConfig?: Record<string, any>,
-): Promise<Awaited<ReturnType<typeof createGenerator>>> {
-  const variantKey = customVariants?.length
-    ? customVariants
-        .map((v) => `${v.name ?? ""}:${String(v.match)}`)
-        .sort()
-        .join(",")
-    : "__default__";
+// --- Compiler creation [ENG-04] ---
+// Tailwind's build() is cumulative — candidates from prior calls persist on the
+// same compiler instance. This means we CANNOT reuse a compiler across calls with
+// different candidate sets, or earlier candidates leak into later CSS output.
+// Instead we cache by (cssInput + sorted candidates) to get isolation.
+// eslint-disable-next-line @typescript-eslint/no-explicit-any -- internal cache exposed for test inspection only
+export const _cache: Map<string, any> = new Map();
 
-  const themeKey = themeConfig ? simpleHash(JSON.stringify(themeConfig)) : "";
-  const key = `${variantKey}|${themeKey}`;
+// --- Layer extraction [ENG-05] ---
+function extractLayers(output: string): {
+  themeCss: string;
+  utilityCss: string;
+  supportCss: string;
+} {
+  // Theme layer regex: matches @layer theme { ... } with non-greedy [\s\S]*? and
+  // positive lookahead (?=@layer) to stop before the next layer block.
+  // RATIONALE: stays raw -- magic-regexp lacks lookahead support and [\s\S] non-greedy quantifiers.
+  const themeMatch = output.match(/@layer theme \{([\s\S]*?)\}\s*(?=@layer)/);
+  const themeCss = themeMatch ? themeMatch[1].trim() : "";
 
-  let gen = _cache.get(key);
-  if (!gen) {
-    gen = await createGenerator({
-      presets: [presetWind4()],
-      ...(themeConfig ? { theme: themeConfig } : {}),
-      ...(customVariants?.length ? { variants: customVariants } : {}),
-    });
-    _cache.set(key, gen);
+  // Tailwind build() output structure (verified against tailwindcss@4.2.2):
+  //   @layer theme { ... }
+  //   @layer base { ... }
+  //   @layer utilities { ... }
+  //   @property --tw-* { ... }      ← runtime contract for some utilities
+  //   @keyframes name { ... }       ← animation utilities
+  //   @layer properties { ... }     ← fallback for browsers without @property
+  //
+  // We extract three buckets:
+  // 1. utilityCss: inner content of @layer utilities (selector rules)
+  // 2. supportCss: everything after @layer utilities closes — @property, @keyframes,
+  //    @layer properties. These are hoisted once per output file, not per-node.
+  const utilStart = output.indexOf("@layer utilities {");
+  let utilityCss = "";
+  let supportCss = "";
+  if (utilStart !== -1) {
+    const contentStart = utilStart + "@layer utilities {".length;
+
+    // Find where post-utilities blocks begin using \n}\n@ boundary pattern.
+    const closePattern = "\n}\n@";
+    const closeIdx = output.indexOf(closePattern, contentStart);
+    const endBoundary = closeIdx !== -1 ? closeIdx + 2 : output.length;
+
+    // Extract utility rules (content inside @layer utilities { ... })
+    const slice = output.slice(contentStart, endBoundary);
+    const lastBrace = slice.lastIndexOf("}");
+    utilityCss = lastBrace !== -1 ? slice.slice(0, lastBrace).trim() : slice.trim();
+
+    // Everything after @layer utilities } is support CSS (hoisted once per file)
+    if (closeIdx !== -1) {
+      supportCss = output.slice(endBoundary + 1).trim(); // +1 to skip the \n after }
+    }
   }
-  return gen;
+
+  return { themeCss, utilityCss, supportCss };
 }
 
-export interface GenerateCSSResult {
+// --- Unmatched detection [ENG-01] ---
+
+/**
+ * Unescape a CSS selector identifier back to its original class name.
+ * Handles:
+ * - `\\:` → `:` (escaped colons for variants like hover\:bg-blue)
+ * - `\\/` → `/` (escaped slashes for fractions like w-1\/2)
+ * - `\\32 xl` → `2xl` (numeric escapes: `\XX ` where XX is hex code point + mandatory space)
+ * - `\\.` → `.` (escaped dots for arbitrary values)
+ * - Generic `\\X` → `X`
+ */
+function unescapeCssSelector(escaped: string): string {
+  // CSS unescape regex: matches hex escape sequences (\HHHHHH + optional space) OR
+  // single-char escapes (\X). Used in .replace() callback with capture group references.
+  // RATIONALE: stays raw -- backreference capture groups in alternation with hex ranges
+  // and quantifier limits ({1,6}) cannot be expressed in magic-regexp.
+  return escaped.replace(/\\([0-9a-fA-F]{1,6})\s?|\\(.)/g, (_, hex, ch) => {
+    if (hex) return String.fromCodePoint(parseInt(hex, 16));
+    return ch;
+  });
+}
+
+function detectMatches(
+  candidates: string[],
+  utilityCss: string,
+): { matched: Set<string>; unmatched: string[] } {
+  // Extract class selectors from CSS. Tailwind emits one selector per rule.
+  // Selectors may contain escaped chars: \: \[ \] \{ \} \, \/ \. \32 (numeric)
+  // Numeric escapes include a mandatory space: \32 xl means char 0x32 ('2') + 'xl'.
+  // We capture from the leading dot up to the opening brace, handling escaped
+  // characters as single units so escaped commas/braces don't terminate prematurely.
+  // Selector extraction regex: matches CSS class selectors handling escaped characters
+  // (hex escapes \HHHHHH, single-char escapes \X) and stops at opening brace.
+  // Non-capturing groups, character class exclusions, and hex range quantifiers.
+  // RATIONALE: stays raw -- nested alternation within character groups, hex range
+  // quantifiers ({1,6}), and non-capturing groups with non-greedy modifiers exceed
+  // magic-regexp's expressive capability.
+  const selectorRe = /^\s*\.((?:\\[0-9a-fA-F]{1,6}\s?|\\.|[^{,\s])*)\s*(?:,.*?)?\s*\{/gm;
+  const generated = new Set<string>();
+  let m;
+  while ((m = selectorRe.exec(utilityCss)) !== null) {
+    generated.add(unescapeCssSelector(m[1].trimEnd()));
+  }
+
+  const matched = new Set<string>();
+  const unmatched: string[] = [];
+  for (const c of candidates) {
+    if (generated.has(c)) matched.add(c);
+    else unmatched.push(c);
+  }
+  return { matched, unmatched };
+}
+
+// --- Public API ---
+export interface TwGenerateCSSResult {
   /** Raw CSS for all matched tokens (without @layer wrappers) */
   css: string;
-  /** :root CSS variable definitions from theme layer (empty string if no theme) */
+  /** :root CSS variable definitions from theme layer */
   themeCss: string;
+  /** @property, @keyframes, @layer properties blocks — hoist once per output file */
+  supportCss: string;
   /** Tokens that successfully generated CSS */
   matched: Set<string>;
   /** Tokens that produced no CSS (coverage gaps) */
@@ -84,96 +150,122 @@ export interface GenerateCSSResult {
 }
 
 /**
- * Strip @layer wrappers from CSS output, returning only the inner rules.
- */
-function stripLayerWrappers(css: string): string {
-  // Match @layer blocks and extract inner content, handling nested braces
-  const result: string[] = [];
-  let match: RegExpExecArray | null;
-
-  // Reset regex state for reuse
-  LAYER_RE.lastIndex = 0;
-
-  while ((match = LAYER_RE.exec(css)) !== null) {
-    let depth = 1;
-    let i = match.index + match[0].length;
-    const start = i;
-    while (i < css.length && depth > 0) {
-      if (css[i] === "{") depth++;
-      else if (css[i] === "}") depth--;
-      i++;
-    }
-    // Extract content between outer braces (excluding the final closing brace)
-    result.push(css.slice(start, i - 1).trim());
-  }
-
-  return result.length > 0 ? result.join("\n") : css.trim();
-}
-
-/**
- * Extract the theme layer CSS from UnoCSS output.
- * UnoCSS emits a `/* layer: theme *​/` section containing :root variable definitions.
- * Returns the content of that section, or empty string if not present.
- */
-function extractThemeLayer(css: string): string {
-  const themeMarker = "/* layer: theme */";
-  const idx = css.indexOf(themeMarker);
-  if (idx === -1) return "";
-  // Find the next layer marker or end of string
-  const nextLayerIdx = css.indexOf("/* layer:", idx + themeMarker.length);
-  const end = nextLayerIdx > -1 ? nextLayerIdx : css.length;
-  return css.slice(idx + themeMarker.length, end).trim();
-}
-
-/**
- * Generate CSS from a set of Tailwind class tokens using UnoCSS.
- * Returns raw CSS (no @layer wrappers), matched/unmatched info, theme CSS, and warnings.
+ * Generate CSS from a set of Tailwind class tokens using Tailwind's
+ * native compile().build() API.
  *
  * @param tokens - Set of Tailwind class tokens to generate CSS for
- * @param customVariants - Optional custom variant objects
- * @param themeConfig - Optional UnoCSS theme config (deep-merged with preset defaults)
- * @returns GenerateCSSResult with CSS string, theme CSS, and match info
+ * @param css - Optional CSS string with @custom-variant, @theme, or other Tailwind directives
+ * @returns TwGenerateCSSResult with CSS string, theme CSS, and match info
  */
-export async function generateCSS(
+export async function twGenerateCSS(
   tokens: Set<string>,
-  customVariants?: VariantObject[],
-  themeConfig?: Record<string, any>,
-): Promise<GenerateCSSResult> {
-  const generator = await getGenerator(customVariants, themeConfig);
-  const result = await generator.generate(tokens);
-
-  // Try to get CSS without @layer wrapper; fall back to full CSS and strip manually
-  let css = result.css;
-
-  // Extract theme layer CSS before stripping layers (THEME-06)
-  const themeCss = extractThemeLayer(css);
-
-  // Strip @layer wrappers if present
-  const hasLayers = css.includes("@layer");
-  if (hasLayers) {
-    css = stripLayerWrappers(css);
+  css?: string,
+): Promise<TwGenerateCSSResult> {
+  // Early return for empty token set
+  if (tokens.size === 0) {
+    return {
+      css: "",
+      themeCss: "",
+      supportCss: "",
+      matched: new Set<string>(),
+      unmatched: [],
+      warnings: [],
+    };
   }
 
-  // Detect unmatched tokens
-  const unmatched = [...tokens].filter((t) => !result.matched.has(t));
+  // Build CSS input [ENG-03: source(none) prevents file scanning]
+  const parts: string[] = ['@import "tailwindcss" source(none);'];
+  if (css) parts.push(css);
+  const cssInput = parts.join("\n");
+
+  // Fresh compile() per call to avoid cumulative build() state leaking
+  // across calls with different candidate sets. compile() is ~4ms which
+  // is acceptable for a build-time tool. [ENG-04: cache by cssInput]
+  const candidates = [...tokens];
+  const cacheKey = cssInput + "\0" + JSON.stringify([...tokens].sort());
+  const cached = _cache.get(cacheKey);
+  if (cached) {
+    // Return a defensive copy so callers can't mutate the cache
+    return {
+      css: cached.css,
+      themeCss: cached.themeCss,
+      supportCss: cached.supportCss,
+      matched: new Set(cached.matched),
+      unmatched: [...cached.unmatched],
+      warnings: cached.warnings.map((w: Warning) => ({ ...w, location: { ...w.location } })),
+    };
+  }
+
+  let compiler;
+  try {
+    compiler = await compile(cssInput, { loadStylesheet });
+  } catch (err: unknown) {
+    // Malformed @theme CSS (e.g. invalid declarations) causes CssSyntaxError.
+    // Gracefully degrade: return empty CSS with a theme-parse-error warning.
+    const msg = err instanceof Error ? err.message : String(err);
+    const warnings: Warning[] = [{
+      type: "theme-parse-error" as const,
+      message: `Tailwind CSS compilation error: ${msg}`,
+      location: { line: 0, column: 0 },
+    }];
+    // Still try to generate without theme by compiling base CSS only
+    const fallbackInput = '@import "tailwindcss" source(none);';
+    const fallbackCompiler = await compile(fallbackInput, { loadStylesheet });
+    const fallbackOutput = fallbackCompiler.build(candidates);
+    const { themeCss: fallbackTheme, utilityCss: fallbackUtility, supportCss: fallbackSupport } = extractLayers(fallbackOutput);
+    const { unmatched: fallbackUnmatched } = detectMatches(candidates, fallbackUtility);
+    warnings.push(...fallbackUnmatched.map((token) => ({
+      type: "unmatched-class" as const,
+      message: `Unmatched Tailwind class: "${token}" -- no CSS generated`,
+      location: { line: 0, column: 0 },
+    })));
+    return {
+      css: fallbackUtility,
+      themeCss: fallbackTheme,
+      supportCss: fallbackSupport,
+      matched: new Set(candidates.filter((c) => !fallbackUnmatched.includes(c))),
+      unmatched: fallbackUnmatched,
+      warnings,
+    };
+  }
+  const output = compiler.build(candidates);
+
+  // Extract layers [ENG-05]
+  const { themeCss: extractedTheme, utilityCss, supportCss } = extractLayers(output);
+
+  // Detect unmatched [ENG-01]
+  const { matched, unmatched } = detectMatches(candidates, utilityCss);
+
   const warnings: Warning[] = unmatched.map((token) => ({
     type: "unmatched-class" as const,
     message: `Unmatched Tailwind class: "${token}" -- no CSS generated`,
     location: { line: 0, column: 0 },
   }));
 
-  return {
-    css,
-    themeCss,
-    matched: result.matched,
+  const result: TwGenerateCSSResult = {
+    css: utilityCss,
+    themeCss: extractedTheme,
+    supportCss,
+    matched,
     unmatched,
     warnings,
   };
+  // Cache a defensive copy to prevent mutation poisoning.
+  // Freeze strings (css, themeCss, supportCss) are immutable. Clone mutable containers.
+  _cache.set(cacheKey, {
+    css: utilityCss,
+    themeCss: extractedTheme,
+    supportCss,
+    matched: new Set(matched),
+    unmatched: [...unmatched],
+    warnings: warnings.map((w) => ({ ...w, location: { ...w.location } })),
+  });
+  return result;
 }
 
 /**
- * Reset the singleton generator (for testing only).
+ * Reset the Tailwind generator cache (for testing only).
  */
-export function resetGenerator(): void {
+export function resetTwGenerator(): void {
   _cache.clear();
 }

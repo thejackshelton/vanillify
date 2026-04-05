@@ -1,12 +1,10 @@
-import { describe, it, expect } from "vite-plus/test";
+import { describe, it, expect } from "vitest";
 import { rewrite } from "./rewriter";
 import { parse } from "./parser";
 import { extract } from "./extractor";
 import { assignNames } from "./namer";
 import { convert } from "../index";
-import { createVariantObject } from "../variants/resolver";
 import type { OutputFormat, Warning } from "../types";
-import type { VariantObject } from "@unocss/core";
 
 /**
  * Helper: run parse -> extract -> assignNames for a source, then call rewrite.
@@ -15,14 +13,13 @@ import type { VariantObject } from "@unocss/core";
 async function rewriteFromSource(
   source: string,
   filename = "test.tsx",
-  customVariants?: VariantObject[],
-  themeConfig?: Record<string, any>,
+  css?: string,
   outputFormat?: OutputFormat,
 ) {
   const { program } = parse(filename, source);
   const { entries, warnings } = extract(program, source);
   const nameMap = assignNames(entries);
-  return rewrite(source, entries, nameMap, warnings, customVariants, themeConfig, outputFormat, filename);
+  return rewrite(source, entries, nameMap, warnings, css, outputFormat, filename);
 }
 
 describe("rewrite", () => {
@@ -92,29 +89,30 @@ describe("rewrite", () => {
     expect(result.warnings).toHaveLength(0);
   });
 
-  it("rewrite with customVariants produces CSS containing custom variant selector", async () => {
+  it("rewrite with @custom-variant css produces CSS containing custom variant selector", async () => {
     const source = '<div className="bg-blue-500 ui-checked:bg-green-500">test</div>';
-    const customVariants = [createVariantObject("ui-checked", "&[ui-checked]")];
-    const result = await rewriteFromSource(source, "test.tsx", customVariants);
+    const css = "@custom-variant ui-checked (&[ui-checked]);";
+    const result = await rewriteFromSource(source, "test.tsx", css);
 
     expect(result.css).toContain(".node0");
     expect(result.css).toContain("[ui-checked]");
     expect(result.css).toContain("background");
     // ui-checked:bg-green-500 should NOT be in unmatched warnings
     const unmatchedNames = result.warnings
-      .filter((w) => w.type === "unmatched-class")
-      .map((w) => w.message);
+      .filter((w: Warning) => w.type === "unmatched-class")
+      .map((w: Warning) => w.message);
     expect(unmatchedNames.join()).not.toContain("ui-checked:bg-green-500");
   });
 });
 
 describe("rewrite with theme support", () => {
-  it("rewrite threads themeConfig to generateCSS", async () => {
+  it("rewrite threads css to generateCSS", async () => {
     const source = 'export function Card() { return <div className="bg-brand p-4">hi</div>; }';
+    const css = "@theme { --color-brand: #ff0000; }";
     const { program } = parse("test.tsx", source);
     const { entries, warnings } = extract(program, source);
     const nameMap = assignNames(entries);
-    const result = await rewrite(source, entries, nameMap, warnings, undefined, { colors: { brand: "#ff0000" } });
+    const result = await rewrite(source, entries, nameMap, warnings, css);
 
     expect(result.css).toContain(".node0");
     expect(result.css).toContain("background");
@@ -123,51 +121,50 @@ describe("rewrite with theme support", () => {
 
   it("rewrite returns themeCss field", async () => {
     const source = '<div className="bg-brand">hi</div>';
+    const css = "@theme { --color-brand: #ff0000; }";
     const { program } = parse("test.tsx", source);
     const { entries, warnings } = extract(program, source);
     const nameMap = assignNames(entries);
-    const result = await rewrite(source, entries, nameMap, warnings, undefined, { colors: { brand: "#ff0000" } });
+    const result = await rewrite(source, entries, nameMap, warnings, css);
 
     expect(result.themeCss).toBeDefined();
     expect(typeof result.themeCss).toBe("string");
   });
 
-  it("rewrite without themeConfig returns preset default themeCss (not custom)", async () => {
+  it("rewrite without css returns preset default themeCss (not custom)", async () => {
     const source = '<div className="flex">hi</div>';
     const { program } = parse("test.tsx", source);
     const { entries, warnings } = extract(program, source);
     const nameMap = assignNames(entries);
     const result = await rewrite(source, entries, nameMap, warnings);
 
-    // UnoCSS preset-wind4 always emits a default theme layer with CSS variables
-    // When no custom themeConfig is provided, this is the preset's default
+    // Tailwind always emits a default theme layer with CSS variables
+    // When no custom css is provided, this is the preset's default
     expect(typeof result.themeCss).toBe("string");
   });
 });
 
 describe("convert() theme integration", () => {
-  it("convert without themeCss produces same output as before (THEME-10)", async () => {
-    const { convert } = await import("../index");
+  it("convert without css produces same output as before (THEME-10)", async () => {
     const source = 'export function App() { return <div className="flex p-4">hi</div>; }';
     const result = await convert(source, "test.tsx");
 
     expect(result.component).toContain("node0");
     expect(result.css).toContain("display");
     expect(result.css).toContain("padding");
-    // themeCss is always a string (preset-wind4 emits default :root variables)
+    // themeCss is always a string (Tailwind emits default :root variables)
     expect(typeof result.themeCss).toBe("string");
-    // No theme-related warnings when no themeCss option provided
+    // No theme-related warnings when no css option provided
     const themeWarnings = result.warnings.filter(
-      (w) => w.type === "unknown-theme-namespace" || w.type === "theme-parse-error"
+      (w) => w.type === "theme-parse-error"
     );
     expect(themeWarnings).toHaveLength(0);
   });
 
-  it("convert with themeCss produces theme-aware CSS", async () => {
-    const { convert } = await import("../index");
+  it("convert with css produces theme-aware CSS", async () => {
     const source = 'export function App() { return <div className="bg-brand p-4">hi</div>; }';
     const result = await convert(source, "test.tsx", {
-      themeCss: "@theme { --color-brand: #ff0000; }",
+      css: "@theme { --color-brand: #ff0000; }",
     });
 
     expect(result.css).toContain("background");
@@ -179,51 +176,36 @@ describe("convert() theme integration", () => {
     expect(unmatchedMsgs.join()).not.toContain("bg-brand");
   });
 
-  it("convert with themeCss returns theme CSS variables in result (THEME-06)", async () => {
-    const { convert } = await import("../index");
+  it("convert with css option returns theme CSS variables in result (THEME-06)", async () => {
     const source = '<div className="bg-brand">hi</div>';
     const result = await convert(source, "test.tsx", {
-      themeCss: "@theme { --color-brand: #ff0000; }",
+      css: "@theme { --color-brand: #ff0000; }",
     });
 
     expect(result.themeCss).toBeDefined();
     expect(typeof result.themeCss).toBe("string");
   });
 
-  it("two convert calls with different themeCss produce different output (THEME-05)", async () => {
-    const { convert } = await import("../index");
-    const { resetGenerator } = await import("./generator");
-    resetGenerator();
+  it("two convert calls with different css produce different output (THEME-05)", async () => {
+    const { resetTwGenerator } = await import("./generator");
+    resetTwGenerator();
 
     const source = '<div className="bg-brand">hi</div>';
     const result1 = await convert(source, "test.tsx", {
-      themeCss: "@theme { --color-brand: #ff0000; }",
+      css: "@theme { --color-brand: #ff0000; }",
     });
     const result2 = await convert(source, "test.tsx", {
-      themeCss: "@theme { --color-brand: #00ff00; }",
+      css: "@theme { --color-brand: #00ff00; }",
     });
 
-    // UnoCSS utility CSS uses CSS variables (color-mix), so utility CSS is identical.
     // The difference is in themeCss which contains the :root variable definitions.
     expect(result1.themeCss).not.toBe(result2.themeCss);
   });
 
-  it("convert with unknown theme namespace includes warning", async () => {
-    const { convert } = await import("../index");
-    const source = '<div className="flex">hi</div>';
-    const result = await convert(source, "test.tsx", {
-      themeCss: "@theme { --unknown-thing: value; }",
-    });
-
-    const nsWarnings = result.warnings.filter((w) => w.type === "unknown-theme-namespace");
-    expect(nsWarnings.length).toBeGreaterThanOrEqual(1);
-  });
-
   it("convert with malformed theme declaration includes warning", async () => {
-    const { convert } = await import("../index");
     const source = '<div className="flex">hi</div>';
     const result = await convert(source, "test.tsx", {
-      themeCss: "@theme { not-a-declaration; }",
+      css: "@theme { not-a-declaration; }",
     });
 
     const parseWarnings = result.warnings.filter((w) => w.type === "theme-parse-error");
@@ -234,7 +216,7 @@ describe("convert() theme integration", () => {
 describe("rewrite with css-modules format", () => {
   it("produces {styles.node0} instead of string literal", async () => {
     const source = '<div className="flex p-4">hi</div>';
-    const result = await rewriteFromSource(source, "test.tsx", undefined, undefined, "css-modules");
+    const result = await rewriteFromSource(source, "test.tsx", undefined, "css-modules");
 
     expect(result.component).toContain("{styles.node0}");
     expect(result.component).not.toContain('"node0"');
@@ -242,14 +224,14 @@ describe("rewrite with css-modules format", () => {
 
   it("prepends import styles from './test.module.css'", async () => {
     const source = '<div className="flex p-4">hi</div>';
-    const result = await rewriteFromSource(source, "test.tsx", undefined, undefined, "css-modules");
+    const result = await rewriteFromSource(source, "test.tsx", undefined, "css-modules");
 
     expect(result.component).toContain("import styles from './test.module.css'");
   });
 
   it("inserts import AFTER existing imports", async () => {
     const source = `import { component$ } from "@qwik.dev/core";\n\nexport default component$(() => {\n  return <div className="flex p-4">hi</div>;\n});`;
-    const result = await rewriteFromSource(source, "test.tsx", undefined, undefined, "css-modules");
+    const result = await rewriteFromSource(source, "test.tsx", undefined, "css-modules");
 
     const lines = result.component.split("\n");
     const qwikImportIdx = lines.findIndex((l: string) => l.includes("@qwik.dev/core"));
@@ -270,21 +252,21 @@ describe("rewrite with css-modules format", () => {
   it("CSS content is identical between vanilla and css-modules", async () => {
     const source = '<div className="flex p-4">hi</div>';
     const vanilla = await rewriteFromSource(source, "test.tsx");
-    const modules = await rewriteFromSource(source, "test.tsx", undefined, undefined, "css-modules");
+    const modules = await rewriteFromSource(source, "test.tsx", undefined, "css-modules");
 
     expect(modules.css).toBe(vanilla.css);
   });
 
   it("leaves dynamic className expressions unchanged", async () => {
     const source = '<div className={active ? "bg-blue-500" : "bg-gray-500"}>hi</div>';
-    const result = await rewriteFromSource(source, "test.tsx", undefined, undefined, "css-modules");
+    const result = await rewriteFromSource(source, "test.tsx", undefined, "css-modules");
 
     expect(result.component).toContain('active ? "bg-blue-500" : "bg-gray-500"');
   });
 
   it("returns classMap in result", async () => {
     const source = '<div className="flex p-4">hi</div>';
-    const result = await rewriteFromSource(source, "test.tsx", undefined, undefined, "css-modules");
+    const result = await rewriteFromSource(source, "test.tsx", undefined, "css-modules");
 
     expect(result.classMap).toBeDefined();
     expect(result.classMap!["node0"]).toBe("node0");

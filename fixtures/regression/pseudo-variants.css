@@ -1,0 +1,30 @@
+.node0 {
+  background-color: var(--color-blue-500);
+}
+
+.node0 {
+  &:hover {
+    @media (hover: hover) {
+      background-color: var(--color-blue-700);
+    }
+  }
+}
+
+.node0 {
+  &:focus {
+    --tw-outline-style: none;
+    outline-style: none;
+  }
+}
+
+.node0 {
+  &:active {
+    background-color: var(--color-blue-800);
+  }
+}
+
+.node0 {
+  &:disabled {
+    opacity: 50%;
+  }
+}

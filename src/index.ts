@@ -2,17 +2,14 @@ import { parse } from "./pipeline/parser";
 import { extract } from "./pipeline/extractor";
 import { assignNames } from "./pipeline/namer";
 import { rewrite } from "./pipeline/rewriter";
-import { resolveCustomVariants } from "./variants/resolver";
-import { parseThemeCss } from "./theme/parser";
-import { mapToThemeConfig } from "./theme/mapper";
-import type { ConvertOptions, ConvertResult, Warning } from "./types";
+import type { ConvertOptions, ConvertResult } from "./types";
 
 /**
  * Convert a JSX/TSX source file from Tailwind classes to vanilla CSS.
  *
  * Accepts source code as a string, extracts Tailwind class names from
  * className/class attributes using AST parsing (not regex), generates
- * vanilla CSS using UnoCSS's createGenerator with preset-wind4, and
+ * vanilla CSS using Tailwind's native compile().build() API, and
  * returns the transformed component with indexed class names (.node0, .node1)
  * plus the generated CSS.
  *
@@ -20,7 +17,7 @@ import type { ConvertOptions, ConvertResult, Warning } from "./types";
  *
  * @param source - JSX/TSX source code string
  * @param filename - Filename for parser language detection (e.g., "component.tsx")
- * @param options - Optional configuration (reserved for Phase 2 customVariants)
+ * @param options - Optional configuration (css, outputFormat)
  * @returns Promise<ConvertResult> with { component, css, warnings }
  */
 export async function convert(
@@ -37,35 +34,20 @@ export async function convert(
   // 3. Assign indexed class names
   const nameMap = assignNames(entries);
 
-  // 4. Resolve custom variants if provided
-  const variantObjects = options?.customVariants
-    ? resolveCustomVariants(options.customVariants)
-    : undefined;
-
-  // 5. Parse theme CSS if provided
-  let themeConfig: Record<string, any> | undefined;
-  const themeWarnings: Warning[] = [];
-
-  if (options?.themeCss) {
-    const parseResult = parseThemeCss(options.themeCss);
-    themeWarnings.push(...parseResult.warnings);
-    const mapResult = mapToThemeConfig(parseResult.declarations);
-    themeWarnings.push(...mapResult.warnings);
-    themeConfig = mapResult.theme;
-  }
-
-  // 6. Rewrite source and generate per-node CSS
-  const result = await rewrite(source, entries, nameMap, extractWarnings, variantObjects, themeConfig, options?.outputFormat, filename);
+  // 4. Rewrite source and generate per-node CSS via Tailwind engine
+  // Pass raw CSS string directly — Tailwind handles @theme and @custom-variant natively
+  const result = await rewrite(
+    source, entries, nameMap, extractWarnings,
+    options?.css, options?.outputFormat, filename,
+  );
 
   return {
     component: result.component,
     css: result.css,
-    themeCss: options?.themeCss ? (result.themeCss ?? "") : "",
-    warnings: [...themeWarnings, ...result.warnings],
+    themeCss: options?.css ? (result.themeCss ?? "") : "",
+    warnings: result.warnings,
     ...(result.classMap ? { classMap: result.classMap } : {}),
   };
 }
 
-export { parseThemeCss } from "./theme/parser";
-export { mapToThemeConfig } from "./theme/mapper";
 export type { ConvertOptions, ConvertResult, OutputFormat, Warning, NodeEntry } from "./types";

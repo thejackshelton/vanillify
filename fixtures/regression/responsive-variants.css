@@ -1,0 +1,27 @@
+.node0 {
+  display: flex;
+}
+
+.node0 {
+  @media (width >= 40rem) {
+    display: grid;
+  }
+}
+
+.node0 {
+  @media (width >= 48rem) {
+    display: none;
+  }
+}
+
+.node0 {
+  @media (width >= 64rem) {
+    display: block;
+  }
+}
+
+.node0 {
+  @media (width >= 80rem) {
+    display: inline-flex;
+  }
+}

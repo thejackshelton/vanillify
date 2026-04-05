@@ -1,0 +1,17 @@
+.node0 {
+  &[ui-checked] {
+    background-color: var(--color-blue-500);
+  }
+}
+
+.node0 {
+  &[ui-disabled] {
+    opacity: 50%;
+  }
+}
+
+.node0 {
+  &[ui-mixed] {
+    background-color: var(--color-purple-500);
+  }
+}

@@ -1,46 +1,19 @@
-import type { CustomVariantsOption } from "./variants/types";
-
 /** Output format for converted CSS and component references. */
 export type OutputFormat = 'vanilla' | 'css-modules';
 
 export interface ConvertOptions {
   /**
-   * Custom variant definitions for opt-in variant resolution.
-   *
-   * Accepts either:
-   * - A CSS string containing @custom-variant directives
-   * - A Record mapping variant names to selector templates (& = target element)
+   * CSS string prepended to Tailwind's base import before compilation.
+   * Use this for @theme blocks, @custom-variant directives, or any other
+   * CSS that Tailwind's compile() should process alongside utilities.
    *
    * @example
-   * // CSS string form:
-   * customVariants: `
+   * css: `
+   *   @theme { --color-brand: #ff0000; }
    *   @custom-variant ui-checked (&[ui-checked]);
-   *   @custom-variant ui-disabled (&[ui-disabled]);
    * `
-   *
-   * @example
-   * // Object form:
-   * customVariants: {
-   *   'ui-checked': '&[ui-checked]',
-   *   'ui-disabled': '&[ui-disabled]',
-   * }
    */
-  customVariants?: CustomVariantsOption;
-
-  /**
-   * CSS string containing `@theme { ... }` blocks with CSS variable declarations.
-   * These are parsed and mapped to UnoCSS theme configuration, enabling
-   * theme-defined classes (e.g., `bg-brand`) to resolve correctly.
-   *
-   * Accepts either a full `@theme { ... }` block or bare declarations.
-   *
-   * @example
-   * themeCss: `@theme {
-   *   --color-brand: #ff0000;
-   *   --spacing-huge: 10rem;
-   * }`
-   */
-  themeCss?: string;
+  css?: string;
 
   /** Output format. 'vanilla' (default) produces bare class names, 'css-modules' produces styles.nodeN expressions with import statement. */
   outputFormat?: OutputFormat;
@@ -63,9 +36,7 @@ export interface Warning {
   type:
     | "dynamic-class"
     | "unmatched-class"
-    | "theme-parse-error"
-    | "unknown-theme-namespace"
-    | "unsupported-theme-reset";
+    | "theme-parse-error";
   message: string;
   location: { line: number; column: number };
 }

@@ -1,4 +1,4 @@
-import { describe, it, expect } from "vite-plus/test";
+import { describe, it, expect } from "vitest";
 import { readFileSync } from "node:fs";
 import { readFile } from "node:fs/promises";
 import { resolve } from "node:path";
@@ -131,11 +131,11 @@ const App = () => (
   });
 });
 
-describe("convert() with customVariants", () => {
-  it("CVAR-01: CSS string input format resolves custom variant", async () => {
+describe("convert() with css option", () => {
+  it("CVAR-01: css option with @custom-variant resolves custom variant", async () => {
     const source = '<div className="bg-blue-500 ui-checked:bg-green-500">test</div>';
     const result = await convert(source, "test.tsx", {
-      customVariants: "@custom-variant ui-checked (&[ui-checked]);",
+      css: "@custom-variant ui-checked (&[ui-checked]);",
     });
     expect(result.css).toContain(".node0");
     expect(result.css).toContain("[ui-checked]");
@@ -147,10 +147,10 @@ describe("convert() with customVariants", () => {
     expect(unmatchedNames.join()).not.toContain("ui-checked:bg-green-500");
   });
 
-  it("CVAR-01: Record input format produces same result as CSS string", async () => {
+  it("CVAR-01: css option with @custom-variant (equivalent of Record form)", async () => {
     const source = '<div className="bg-blue-500 ui-checked:bg-green-500">test</div>';
     const result = await convert(source, "test.tsx", {
-      customVariants: { "ui-checked": "&[ui-checked]" },
+      css: "@custom-variant ui-checked (&[ui-checked]);",
     });
     expect(result.css).toContain(".node0");
     expect(result.css).toContain("[ui-checked]");
@@ -164,7 +164,7 @@ describe("convert() with customVariants", () => {
   it("CVAR-02: ancestor-descendant selector pattern", async () => {
     const source = '<div className="ui-checked:bg-blue-500">test</div>';
     const result = await convert(source, "test.tsx", {
-      customVariants: "@custom-variant ui-checked ([ui-checked] &);",
+      css: "@custom-variant ui-checked ([ui-checked] &);",
     });
     expect(result.css).toContain("[ui-checked]");
     expect(result.css).toContain(".node0");
@@ -174,7 +174,7 @@ describe("convert() with customVariants", () => {
     const source =
       '<div className="ui-checked:bg-blue-500 ui-disabled:opacity-50 ui-mixed:bg-purple-500">test</div>';
     const result = await convert(source, "test.tsx", {
-      customVariants: `
+      css: `
         @custom-variant ui-checked (&[ui-checked]);
         @custom-variant ui-disabled (&[ui-disabled]);
         @custom-variant ui-mixed (&[ui-mixed]);
@@ -188,16 +188,16 @@ describe("convert() with customVariants", () => {
   it("CVAR-02: custom variant stacked with hover", async () => {
     const source = '<button className="ui-checked:hover:bg-blue-700">click</button>';
     const result = await convert(source, "test.tsx", {
-      customVariants: { "ui-checked": "&[ui-checked]" },
+      css: "@custom-variant ui-checked (&[ui-checked]);",
     });
     expect(result.css).toContain(":hover");
     expect(result.css).toContain("[ui-checked]");
   });
 
-  it("CVAR-03: no customVariants = Phase 1 behavior (regression)", async () => {
+  it("CVAR-03: no css option = Phase 1 behavior (regression)", async () => {
     const source = '<div className="flex p-4 ui-checked:bg-blue-500">test</div>';
     const result = await convert(source, "test.tsx");
-    // Without customVariants, ui-checked:bg-blue-500 should be unmatched
+    // Without css option, ui-checked:bg-blue-500 should be unmatched
     const unmatchedWarnings = result.warnings.filter((w) => w.type === "unmatched-class");
     expect(unmatchedWarnings.some((w) => w.message.includes("ui-checked"))).toBe(true);
     // Standard utilities should still work
@@ -205,7 +205,7 @@ describe("convert() with customVariants", () => {
     expect(result.css).toContain("padding");
   });
 
-  it("CVAR-03: convert without customVariants does not match ui-checked tokens", async () => {
+  it("CVAR-03: convert without css option does not match ui-checked tokens", async () => {
     const source = '<div className="ui-checked:bg-blue-500">test</div>';
     const result = await convert(source, "test.tsx");
     // Should appear as unmatched
@@ -218,7 +218,7 @@ describe("convert - fixture snapshots (PKG-03)", () => {
   it("Qwik checkbox produces stable CSS output", async () => {
     const source = await readFile(resolve(__dirname, "../../fixtures/checkbox.tsx"), "utf-8");
     const result = await convert(source, "checkbox.tsx", {
-      customVariants: `
+      css: `
         @custom-variant ui-checked (&[ui-checked]);
         @custom-variant ui-disabled (&[ui-disabled]);
         @custom-variant ui-mixed (&[ui-mixed]);
@@ -239,7 +239,7 @@ describe("convert - fixture snapshots (PKG-03)", () => {
   it("Qwik checkbox reports no errors for resolvable classes", async () => {
     const source = await readFile(resolve(__dirname, "../../fixtures/checkbox.tsx"), "utf-8");
     const result = await convert(source, "checkbox.tsx", {
-      customVariants: `
+      css: `
         @custom-variant ui-checked (&[ui-checked]);
         @custom-variant ui-disabled (&[ui-disabled]);
         @custom-variant ui-mixed (&[ui-mixed]);

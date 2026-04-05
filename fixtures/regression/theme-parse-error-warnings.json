@@ -1,0 +1,10 @@
+[
+  {
+    "type": "theme-parse-error",
+    "message": "Tailwind CSS compilation error: Invalid declaration: `not-a-declaration`",
+    "location": {
+      "line": 0,
+      "column": 0
+    }
+  }
+]

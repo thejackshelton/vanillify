@@ -1,0 +1,18 @@
+[
+  {
+    "type": "unmatched-class",
+    "message": "Unmatched Tailwind class: \"not-a-real-class\" -- no CSS generated",
+    "location": {
+      "line": 0,
+      "column": 0
+    }
+  },
+  {
+    "type": "unmatched-class",
+    "message": "Unmatched Tailwind class: \"another-fake\" -- no CSS generated",
+    "location": {
+      "line": 0,
+      "column": 0
+    }
+  }
+]
