@@ -12,26 +12,41 @@ Accurate, reliable conversion of Tailwind classes to vanilla CSS — powered by 
 
 ### Validated
 
-(None yet — ship to validate)
+<!-- Shipped and confirmed valuable in v1.0 -->
+
+- ✓ Programmatic API: `import { convert } from 'vanillify'` — v1.0/Phase 1
+- ✓ CLI wrapper: `npx vanillify <files>` — v1.0/Phase 3
+- ✓ AST-based class extraction using `oxc-parser` — v1.0/Phase 1
+- ✓ UnoCSS `createGenerator` as the CSS generation engine — v1.0/Phase 1
+- ✓ Indexed class naming (`.node0`, `.node1`) — v1.0/Phase 1
+- ✓ Standard Tailwind v4 utilities (flex, grid, colors, spacing, etc.) — v1.0/Phase 1
+- ✓ Variant prefixes (hover:, focus:, responsive, stacked) — v1.0/Phase 1
+- ✓ Opt-in custom variant resolution (`@custom-variant`) — v1.0/Phase 2
+- ✓ Framework-agnostic JSX/TSX parsing — v1.0/Phase 1
+- ✓ Dual ESM+CJS build with typed exports — v1.0/Phase 3
 
 ### Active
 
-- [ ] Programmatic API: `import { convert } from 'vanillify'` — returns CSS string + transformed component in-memory
-- [ ] CLI wrapper: `npx vanillify <files>` — writes converted files to disk
-- [ ] AST-based class extraction using `oxc-parser` (not regex)
-- [ ] UnoCSS `createGenerator` as the CSS generation engine
-- [ ] Indexed class naming for generated selectors (`.node0`, `.node1`, etc.)
-- [ ] Handle standard Tailwind v4 utilities (flex, grid, colors, spacing, etc.)
-- [ ] Handle variant prefixes (hover:, focus:, etc.) converting to proper pseudo-selectors
-- [ ] Opt-in custom variant resolution: allow users to pass `@custom-variant` definitions (e.g. from a CSS file) so the converter can resolve custom variants like `ui-checked`, `ui-disabled` to simplified descendant selectors in vanilla CSS
-- [ ] Framework-agnostic JSX/TSX parsing (works with any framework, tested against Qwik examples)
+- [ ] Migrate build/test/lint/fmt to unified vite-plus `defineConfig` (replace separate tsdown/vitest configs)
+- [ ] Switch package manager from npm to pnpm
+- [ ] Replace all regex patterns with magic-regexp for readability and safety
+- [ ] Tailwind v4 `@theme` block support — resolve theme-defined classes to correct CSS output (approach TBD: preset-wind4 native vs oxc-parser fallback)
 
 ### Out of Scope
 
-- Theme support (`@theme` block conversion) — complexity not justified for v1, revisit later
 - Semantic class naming (future: local AI model integration for naming)
-- CSS Modules output format — vanilla CSS only for v1
+- CSS Modules output format — vanilla CSS only
 - Runtime/JIT conversion — this is a build-time/static tool
+
+## Current Milestone: v1.1 Toolchain & Theme Support
+
+**Goal:** Modernize the build toolchain to vite-plus, adopt magic-regexp for all pattern matching, and add Tailwind v4 theme support.
+
+**Target features:**
+- Migrate build/test/lint/fmt config to unified vite-plus `defineConfig`
+- Switch from npm to pnpm
+- Replace all regex with magic-regexp
+- Tailwind v4 `@theme` block support (approach TBD pending research)
 
 ## Context
 
@@ -77,4 +92,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-04-04 after initialization*
+*Last updated: 2026-04-05 after milestone v1.1 started*
