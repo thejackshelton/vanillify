@@ -26,11 +26,11 @@ Requirements for the Tailwind compile() engine migration.
 
 ### Engine
 
-- [ ] **ENG-01**: `convert()` produces CSS using Tailwind v4's `compile().build()` API instead of UnoCSS's `createGenerator().generate()`
-- [ ] **ENG-02**: Tailwind compiler resolves `@import "tailwindcss"` via a `loadStylesheet` callback without filesystem dependency
-- [ ] **ENG-03**: `source(none)` directive disables Tailwind's automatic file scanning — candidates come from oxc-parser only
-- [ ] **ENG-04**: Compiler instances are cached by CSS input hash to avoid redundant `compile()` calls
-- [ ] **ENG-05**: CSS output separates utility CSS from theme variable CSS (`:root` block), preserving the `themeCss` field in `ConvertResult`
+- [x] **ENG-01**: `convert()` produces CSS using Tailwind v4's `compile().build()` API instead of UnoCSS's `createGenerator().generate()`
+- [x] **ENG-02**: Tailwind compiler resolves `@import "tailwindcss"` via a `loadStylesheet` callback without filesystem dependency
+- [x] **ENG-03**: `source(none)` directive disables Tailwind's automatic file scanning — candidates come from oxc-parser only
+- [x] **ENG-04**: Compiler instances are cached by CSS input hash to avoid redundant `compile()` calls
+- [x] **ENG-05**: CSS output separates utility CSS from theme variable CSS (`:root` block), preserving the `themeCss` field in `ConvertResult`
 
 ### Regression
 
@@ -98,11 +98,11 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| ENG-01 | Phase 9 | Pending |
-| ENG-02 | Phase 9 | Pending |
-| ENG-03 | Phase 9 | Pending |
-| ENG-04 | Phase 9 | Pending |
-| ENG-05 | Phase 9 | Pending |
+| ENG-01 | Phase 9 | Complete |
+| ENG-02 | Phase 9 | Complete |
+| ENG-03 | Phase 9 | Complete |
+| ENG-04 | Phase 9 | Complete |
+| ENG-05 | Phase 9 | Complete |
 | REG-01 | Phase 8 | Complete |
 | REG-02 | Phase 10 | Pending |
 | REG-03 | Phase 10 | Pending |

@@ -177,7 +177,10 @@ Plans:
   3. `source(none)` prevents Tailwind from scanning files -- only oxc-parser-extracted candidates are processed
   4. Repeated calls with identical CSS input reuse a cached compiler instance (verified by test spy or timing)
   5. CSS output cleanly separates utility rules from `:root` theme variables, preserving the `themeCss` field shape
-**Plans**: TBD
+**Plans:** 1 plan
+
+Plans:
+- [x] 09-01-PLAN.md -- Tailwind compile().build() adapter with virtual loadStylesheet, caching, layer separation, and unit tests (TDD)
 
 ### Phase 10: Pipeline Wiring and Rewriter Adaptation
 **Goal**: End-to-end conversion works through the Tailwind engine with the rewriter producing correct output for Tailwind's CSS format
@@ -217,7 +220,7 @@ Phases execute in numeric order: 8 -> 9 -> 10 -> 11
 | 5. Code Quality | v1.1 | 2/2 | Complete | 2026-04-05 |
 | 6. Theme Support | v1.1 | 3/3 | Complete | 2026-04-05 |
 | 7. CSS Modules Output | v1.1 | 2/2 | Complete | 2026-04-05 |
-| 8. Regression Test Baseline | v2.0 | 0/1 | In progress | - |
-| 9. Tailwind Adapter Module | v2.0 | 0/0 | Not started | - |
+| 8. Regression Test Baseline | v2.0 | 1/1 | Complete | - |
+| 9. Tailwind Adapter Module | v2.0 | 0/1 | Not started | - |
 | 10. Pipeline Wiring and Rewriter Adaptation | v2.0 | 0/0 | Not started | - |
 | 11. Cleanup and API Verification | v2.0 | 0/0 | Not started | - |
