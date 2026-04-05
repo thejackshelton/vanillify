@@ -6,6 +6,7 @@ import { glob } from "tinyglobby";
 import { basename, dirname, join, resolve } from "pathe";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { convert } from "./index";
+import type { ConvertOptions } from "./types";
 
 /** Matches JSX/TSX file extensions at end of string */
 const EXT_RE = createRegExp(
@@ -34,6 +35,11 @@ const main = defineCommand({
       alias: "c",
       description: "Path to CSS file with @custom-variant definitions",
     },
+    theme: {
+      type: "string",
+      alias: "t",
+      description: "Path to CSS file with @theme block definitions",
+    },
   },
   async run({ args }) {
     // Expand globs using tinyglobby (handles citty positional arg behavior)
@@ -53,7 +59,18 @@ const main = defineCommand({
       customVariantsCSS = await readFile(resolve(args.customVariants), "utf-8");
     }
 
-    const options = customVariantsCSS ? { customVariants: customVariantsCSS } : undefined;
+    // Read theme CSS file if provided
+    let themeCss: string | undefined;
+    if (args.theme) {
+      themeCss = await readFile(resolve(args.theme), "utf-8");
+    }
+
+    const options: ConvertOptions | undefined = (customVariantsCSS || themeCss)
+      ? {
+          ...(customVariantsCSS ? { customVariants: customVariantsCSS } : {}),
+          ...(themeCss ? { themeCss } : {}),
+        }
+      : undefined;
 
     let processed = 0;
     for (const file of files) {
@@ -69,7 +86,10 @@ const main = defineCommand({
         const ext = file.match(EXT_RE)?.[0] ?? ".tsx";
 
         await mkdir(dir, { recursive: true });
-        await writeFile(join(dir, `${name}.vanilla.css`), result.css);
+        const fullCss = result.themeCss
+          ? `${result.themeCss}\n\n${result.css}`
+          : result.css;
+        await writeFile(join(dir, `${name}.vanilla.css`), fullCss);
         await writeFile(join(dir, `${name}.vanilla${ext}`), result.component);
 
         // Report warnings
