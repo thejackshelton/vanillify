@@ -30,8 +30,12 @@
   "dependencies": {
     "@unocss/core": "^66.6.7",
     "@unocss/preset-wind4": "^66.6.7",
+    "citty": "^0.2.2",
+    "consola": "^3.4.2",
     "oxc-parser": "^0.123.0",
-    "oxc-walker": "^0.7.0"
+    "oxc-walker": "^0.7.0",
+    "pathe": "^2.0.3",
+    "tinyglobby": "^0.2.15"
   },
   "devDependencies": {
     "@types/node": "^25.5.2",
@@ -42,5 +46,8 @@
   "engines": {
     "node": ">=20"
   },
+  "files": [
+    "dist"
+  ],
   "license": "MIT"
 }
