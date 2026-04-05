@@ -50,14 +50,16 @@ function extractLayers(output: string): {
   if (utilStart !== -1) {
     const contentStart = utilStart + "@layer utilities {".length;
 
-    // Find where post-utilities blocks begin (if any)
-    // These always start at column 0 on a new line after @layer utilities closes
-    const postUtilPatterns = ["\n@property ", "\n@property\t", "\n@layer properties"];
-    let endBoundary = output.length;
-    for (const pat of postUtilPatterns) {
-      const idx = output.indexOf(pat, contentStart);
-      if (idx !== -1 && idx < endBoundary) endBoundary = idx;
-    }
+    // Find where post-utilities blocks begin (if any).
+    // Tailwind may emit @property, @layer properties, @keyframes, etc. after @layer utilities.
+    // All top-level directives start with \n@ at column 0. Find the first such occurrence
+    // after the utilities content (skipping the \n@ inside nested rules by requiring
+    // it appears after the utilities block closes — we search from contentStart and
+    // the pattern \n}\n@ reliably marks the end of @layer utilities followed by a directive).
+    const closePattern = "\n}\n@";
+    const closeIdx = output.indexOf(closePattern, contentStart);
+    // endBoundary is right after the closing } of @layer utilities
+    const endBoundary = closeIdx !== -1 ? closeIdx + 2 : output.length; // +2 to include \n}
 
     // The closing } of @layer utilities is the last } before the endBoundary
     const slice = output.slice(contentStart, endBoundary);
