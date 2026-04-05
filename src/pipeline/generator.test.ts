@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach } from 'vitest'
-import { generateCSS, resetGenerator } from './generator'
+import { generateCSS, getGenerator, resetGenerator } from './generator'
+import { createVariantObject } from '../variants/resolver'
 
 describe('generateCSS', () => {
   beforeEach(() => {
@@ -90,5 +91,30 @@ describe('generateCSS', () => {
 
     // CSS should have newlines (not minified)
     expect(result.css).toContain('\n')
+  })
+
+  it('generates CSS with custom variant producing custom selector', async () => {
+    const customVariants = [createVariantObject('ui-checked', '&[ui-checked]')]
+    const tokens = new Set(['ui-checked:bg-blue-500'])
+    const result = await generateCSS(tokens, customVariants)
+
+    expect(result.css).toContain('[ui-checked]')
+    expect(result.css).toContain('background')
+    expect(result.matched.has('ui-checked:bg-blue-500')).toBe(true)
+    expect(result.unmatched).toHaveLength(0)
+  })
+
+  it('getGenerator without args returns default (no custom variants matched)', async () => {
+    const gen = await getGenerator()
+    const result = await gen.generate(new Set(['ui-checked:bg-blue-500']))
+    // Without custom variants, ui-checked: prefix should NOT match
+    expect(result.matched.has('ui-checked:bg-blue-500')).toBe(false)
+  })
+
+  it('getGenerator caches generators with same variant names', async () => {
+    const variants = [createVariantObject('ui-checked', '&[ui-checked]')]
+    const gen1 = await getGenerator(variants)
+    const gen2 = await getGenerator(variants)
+    expect(gen1).toBe(gen2)
   })
 })

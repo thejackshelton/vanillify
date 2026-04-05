@@ -3,17 +3,19 @@ import { rewrite } from './rewriter'
 import { parse } from './parser'
 import { extract } from './extractor'
 import { assignNames } from './namer'
+import { createVariantObject } from '../variants/resolver'
 import type { Warning } from '../types'
+import type { VariantObject } from '@unocss/core'
 
 /**
  * Helper: run parse -> extract -> assignNames for a source, then call rewrite.
  * This ensures span offsets are always correct (from the actual parser).
  */
-async function rewriteFromSource(source: string, filename = 'test.tsx') {
+async function rewriteFromSource(source: string, filename = 'test.tsx', customVariants?: VariantObject[]) {
   const { program } = parse(filename, source)
   const { entries, warnings } = extract(program, source)
   const nameMap = assignNames(entries)
-  return rewrite(source, entries, nameMap, warnings)
+  return rewrite(source, entries, nameMap, warnings, customVariants)
 }
 
 describe('rewrite', () => {
@@ -79,5 +81,18 @@ describe('rewrite', () => {
     expect(result.component).toBe(source)
     expect(result.css).toBe('')
     expect(result.warnings).toHaveLength(0)
+  })
+
+  it('rewrite with customVariants produces CSS containing custom variant selector', async () => {
+    const source = '<div className="bg-blue-500 ui-checked:bg-green-500">test</div>'
+    const customVariants = [createVariantObject('ui-checked', '&[ui-checked]')]
+    const result = await rewriteFromSource(source, 'test.tsx', customVariants)
+
+    expect(result.css).toContain('.node0')
+    expect(result.css).toContain('[ui-checked]')
+    expect(result.css).toContain('background')
+    // ui-checked:bg-green-500 should NOT be in unmatched warnings
+    const unmatchedNames = result.warnings.filter(w => w.type === 'unmatched-class').map(w => w.message)
+    expect(unmatchedNames.join()).not.toContain('ui-checked:bg-green-500')
   })
 })
