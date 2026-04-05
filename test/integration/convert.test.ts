@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import { readFileSync } from 'node:fs'
+import { readFile } from 'node:fs/promises'
 import { resolve } from 'node:path'
 import { convert } from '../../src/index'
 
@@ -205,5 +206,46 @@ describe('convert() with customVariants', () => {
     // Should appear as unmatched
     const unmatchedWarnings = result.warnings.filter(w => w.type === 'unmatched-class')
     expect(unmatchedWarnings.some(w => w.message.includes('ui-checked'))).toBe(true)
+  })
+})
+
+describe('convert - fixture snapshots (PKG-03)', () => {
+  it('Qwik checkbox produces stable CSS output', async () => {
+    const source = await readFile(resolve(__dirname, '../../fixtures/checkbox.tsx'), 'utf-8')
+    const result = await convert(source, 'checkbox.tsx', {
+      customVariants: `
+        @custom-variant ui-checked (&[ui-checked]);
+        @custom-variant ui-disabled (&[ui-disabled]);
+        @custom-variant ui-mixed (&[ui-mixed]);
+      `,
+    })
+
+    // Verify non-empty output
+    expect(result.css).toBeTruthy()
+    expect(result.component).toBeTruthy()
+
+    // Snapshot against committed fixture files
+    await expect(result.css).toMatchFileSnapshot(
+      resolve(__dirname, '../../fixtures/checkbox.css')
+    )
+    await expect(result.component).toMatchFileSnapshot(
+      resolve(__dirname, '../../fixtures/checkbox.component.tsx')
+    )
+  })
+
+  it('Qwik checkbox reports no errors for resolvable classes', async () => {
+    const source = await readFile(resolve(__dirname, '../../fixtures/checkbox.tsx'), 'utf-8')
+    const result = await convert(source, 'checkbox.tsx', {
+      customVariants: `
+        @custom-variant ui-checked (&[ui-checked]);
+        @custom-variant ui-disabled (&[ui-disabled]);
+        @custom-variant ui-mixed (&[ui-mixed]);
+      `,
+    })
+
+    // With custom variants provided, no classes should be unmatched
+    // The key assertion: no dynamic-class warnings (all classes are static strings)
+    const dynamicWarnings = result.warnings.filter(w => w.type === 'dynamic-class')
+    expect(dynamicWarnings).toHaveLength(0)
   })
 })
