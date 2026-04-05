@@ -9,8 +9,8 @@ Requirements for initial release. Each maps to roadmap phases.
 
 ### Core Pipeline
 
-- [ ] **CORE-01**: Library exposes `convert()` function that accepts JSX/TSX source string and returns CSS string + transformed component string in-memory
-- [ ] **CORE-02**: oxc-parser extracts class/className attribute values from JSX/TSX AST (not regex)
+- [x] **CORE-01**: Library exposes `convert()` function that accepts JSX/TSX source string and returns CSS string + transformed component string in-memory
+- [x] **CORE-02**: oxc-parser extracts class/className attribute values from JSX/TSX AST (not regex)
 - [ ] **CORE-03**: UnoCSS `createGenerator` with `preset-wind4` generates CSS from extracted Tailwind classes
 - [ ] **CORE-04**: Generated CSS uses indexed class names (`.node0`, `.node1`, etc.) assigned per JSX element
 - [ ] **CORE-05**: Output CSS is formatted and readable (not minified)
@@ -70,8 +70,8 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| CORE-01 | Phase 1 | Pending |
-| CORE-02 | Phase 1 | Pending |
+| CORE-01 | Phase 1 | Complete |
+| CORE-02 | Phase 1 | Complete |
 | CORE-03 | Phase 1 | Pending |
 | CORE-04 | Phase 1 | Pending |
 | CORE-05 | Phase 1 | Pending |
