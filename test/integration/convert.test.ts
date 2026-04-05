@@ -129,3 +129,81 @@ const App = () => (
     expect(result.warnings).toHaveLength(0)
   })
 })
+
+describe('convert() with customVariants', () => {
+  it('CVAR-01: CSS string input format resolves custom variant', async () => {
+    const source = '<div className="bg-blue-500 ui-checked:bg-green-500">test</div>'
+    const result = await convert(source, 'test.tsx', {
+      customVariants: '@custom-variant ui-checked (&[ui-checked]);',
+    })
+    expect(result.css).toContain('.node0')
+    expect(result.css).toContain('[ui-checked]')
+    expect(result.css).toContain('background')
+    // ui-checked:bg-green-500 should NOT be in unmatched warnings
+    const unmatchedNames = result.warnings.filter(w => w.type === 'unmatched-class').map(w => w.message)
+    expect(unmatchedNames.join()).not.toContain('ui-checked:bg-green-500')
+  })
+
+  it('CVAR-01: Record input format produces same result as CSS string', async () => {
+    const source = '<div className="bg-blue-500 ui-checked:bg-green-500">test</div>'
+    const result = await convert(source, 'test.tsx', {
+      customVariants: { 'ui-checked': '&[ui-checked]' },
+    })
+    expect(result.css).toContain('.node0')
+    expect(result.css).toContain('[ui-checked]')
+    expect(result.css).toContain('background')
+    const unmatchedNames = result.warnings.filter(w => w.type === 'unmatched-class').map(w => w.message)
+    expect(unmatchedNames.join()).not.toContain('ui-checked:bg-green-500')
+  })
+
+  it('CVAR-02: ancestor-descendant selector pattern', async () => {
+    const source = '<div className="ui-checked:bg-blue-500">test</div>'
+    const result = await convert(source, 'test.tsx', {
+      customVariants: '@custom-variant ui-checked ([ui-checked] &);',
+    })
+    expect(result.css).toContain('[ui-checked]')
+    expect(result.css).toContain('.node0')
+  })
+
+  it('CVAR-02: multiple custom variants (QDS pattern)', async () => {
+    const source = '<div className="ui-checked:bg-blue-500 ui-disabled:opacity-50 ui-mixed:bg-purple-500">test</div>'
+    const result = await convert(source, 'test.tsx', {
+      customVariants: `
+        @custom-variant ui-checked (&[ui-checked]);
+        @custom-variant ui-disabled (&[ui-disabled]);
+        @custom-variant ui-mixed (&[ui-mixed]);
+      `,
+    })
+    expect(result.css).toContain('[ui-checked]')
+    expect(result.css).toContain('[ui-disabled]')
+    expect(result.css).toContain('[ui-mixed]')
+  })
+
+  it('CVAR-02: custom variant stacked with hover', async () => {
+    const source = '<button className="ui-checked:hover:bg-blue-700">click</button>'
+    const result = await convert(source, 'test.tsx', {
+      customVariants: { 'ui-checked': '&[ui-checked]' },
+    })
+    expect(result.css).toContain(':hover')
+    expect(result.css).toContain('[ui-checked]')
+  })
+
+  it('CVAR-03: no customVariants = Phase 1 behavior (regression)', async () => {
+    const source = '<div className="flex p-4 ui-checked:bg-blue-500">test</div>'
+    const result = await convert(source, 'test.tsx')
+    // Without customVariants, ui-checked:bg-blue-500 should be unmatched
+    const unmatchedWarnings = result.warnings.filter(w => w.type === 'unmatched-class')
+    expect(unmatchedWarnings.some(w => w.message.includes('ui-checked'))).toBe(true)
+    // Standard utilities should still work
+    expect(result.css).toContain('display')
+    expect(result.css).toContain('padding')
+  })
+
+  it('CVAR-03: convert without customVariants does not match ui-checked tokens', async () => {
+    const source = '<div className="ui-checked:bg-blue-500">test</div>'
+    const result = await convert(source, 'test.tsx')
+    // Should appear as unmatched
+    const unmatchedWarnings = result.warnings.filter(w => w.type === 'unmatched-class')
+    expect(unmatchedWarnings.some(w => w.message.includes('ui-checked'))).toBe(true)
+  })
+})
