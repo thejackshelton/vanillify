@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: Toolchain & Theme Support
-status: defining
+status: ready_to_plan
 stopped_at: null
 last_updated: "2026-04-05"
 last_activity: 2026-04-05
 progress:
-  total_phases: 0
-  completed_phases: 0
-  total_plans: 0
-  completed_plans: 0
-  percent: 0
+  total_phases: 6
+  completed_phases: 3
+  total_plans: 8
+  completed_plans: 8
+  percent: 53
 ---
 
 # Project State
@@ -21,14 +21,16 @@ progress:
 See: .planning/PROJECT.md (updated 2026-04-05)
 
 **Core value:** Accurate, reliable conversion of Tailwind classes to vanilla CSS via UnoCSS's createGenerator
-**Current focus:** Defining requirements for v1.1
+**Current focus:** Phase 4 - Toolchain Foundation
 
 ## Current Position
 
-Phase: Not started (defining requirements)
-Plan: —
-Status: Defining requirements
-Last activity: 2026-04-05 - Completed quick task 260405-c9j: Create a README for the vanillify project
+Phase: 4 of 6 (Toolchain Foundation)
+Plan: 0 of ? in current phase
+Status: Ready to plan
+Last activity: 2026-04-05 -- Roadmap created for v1.1 milestone (Phases 4-6)
+
+Progress: [========......] 53% (8 plans complete across v1.0, v1.1 starting)
 
 ## Performance Metrics
 
@@ -68,19 +70,10 @@ Last activity: 2026-04-05 - Completed quick task 260405-c9j: Create a README for
 Decisions are logged in PROJECT.md Key Decisions table.
 Recent decisions affecting current work:
 
-- Roadmap: Merged VARI requirements into Phase 1 (UnoCSS handles standard variants via preset-wind4 — no separate phase needed)
-- Roadmap: CVAR kept as standalone Phase 2 (requires custom translation layer — most complex feature)
-- Roadmap: CLI and PKG combined into Phase 3 (CLI is a thin wrapper, packaging is delivery work — natural co-location)
-- [Phase 01-core-pipeline]: oxc-walker pinned to ^0.7.0 (not ^0.1.0) for oxc-parser >=0.98.0 peer dep compatibility
-- [Phase 01-core-pipeline]: oxc-walker walk() used for AST traversal over manual recursion; oxc-parser Literal node type (not StringLiteral) confirmed for ESTree compat
-- [Phase 01-core-pipeline]: UnoCSS createGenerator with preset-wind4 confirmed working for all standard Tailwind v4 utilities, pseudo-class/responsive/stacked variants, and arbitrary values
-- [Phase 01-core-pipeline]: Per-node CSS generation isolates each element's CSS for clean .nodeN selector replacement
-- [Phase 01-core-pipeline]: Default layer extraction skips UnoCSS theme/base/properties layers to keep output clean
-- [Phase 02-custom-variant-resolution]: Regex parser sufficient for @custom-variant shorthand -- no full CSS parser needed
-- [Phase 02-custom-variant-resolution]: Generator cache keyed by sorted variant names replaces singleton -- supports multiple variant configs with bounded growth
-- [Phase 02-custom-variant-resolution]: extractPseudo extended to handle attribute selector suffixes ([attr]) for custom variant CSS
-- [Phase 03-cli-and-package]: Updated package.json export paths from .js/.d.ts to .mjs/.d.mts to match tsdown output with type:module
-- [Phase 03-cli-and-package]: Used toMatchFileSnapshot over inline snapshots for readable, diffable fixture files
+- [v1.1 Roadmap]: pnpm migration is foundational -- must precede vite-plus adoption
+- [v1.1 Roadmap]: @theme support is a parsing problem -- UnoCSS's JS theme config already handles generation
+- [v1.1 Roadmap]: magic-regexp replaces static patterns only; dynamic patterns in rewriter.ts stay raw
+- [v1.1 Roadmap]: 3 phases (coarse granularity): Toolchain -> Code Quality -> Theme Support
 
 ### Pending Todos
 
@@ -88,9 +81,9 @@ None yet.
 
 ### Blockers/Concerns
 
-- Phase 1: Validate `generate()` input contract early — whether passing minimal HTML wrapper vs. full JSX source produces different output is untested (Pitfall 7 from research)
-- Phase 1: Build preset-wind4 class-coverage test matrix against Tailwind v4 docs to surface gaps before shipping
-- Phase 2: `@custom-variant` → UnoCSS variant format translation is underdocumented — may need design work before implementation
+- vite-plus is alpha (v0.1.15) -- pin version, verify output matches tsdown before removing old config
+- Wind4 theme key mapping needs empirical validation in Phase 6
+- magic-regexp unplugin compatibility with Rolldown/tsdown is undocumented -- test in Phase 5, accept runtime fallback if needed
 
 ### Quick Tasks Completed
 
@@ -100,6 +93,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-04-05T05:16:54.556Z
-Stopped at: Completed 03-02-PLAN.md
+Last session: 2026-04-05
+Stopped at: Roadmap created for v1.1 milestone (Phases 4-6)
 Resume file: None

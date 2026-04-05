@@ -35,13 +35,13 @@ Requirements for Toolchain & Theme Support milestone.
 - [ ] **THEME-01**: `convert()` accepts optional `themeCss: string` containing `@theme { ... }` CSS block
 - [ ] **THEME-02**: Parser extracts CSS variable declarations from `@theme` blocks, handling comments, duplicates (last wins), and malformed declarations (warn + skip)
 - [ ] **THEME-03**: Namespace mapper translates `--namespace-name: value` to UnoCSS theme config keys with a tested conformance matrix for preset-wind4@66.6.7
-- [ ] **THEME-04**: Theme config extends preset-wind4 defaults (not replaces) — user's `--color-brand` adds to existing colors, doesn't remove red/blue/etc.
+- [ ] **THEME-04**: Theme config extends preset-wind4 defaults (not replaces) -- user's `--color-brand` adds to existing colors, doesn't remove red/blue/etc.
 - [ ] **THEME-05**: Generator cache key includes theme identity so different theme configs produce different generators
 - [ ] **THEME-06**: ConvertResult includes theme CSS (`:root` variable definitions) alongside utility CSS
 - [ ] **THEME-07**: Unknown namespaces are warned but passed through as custom theme keys (not silently dropped)
 - [ ] **THEME-08**: CLI accepts `--theme <file>` flag, reads CSS file, passes contents to library as `themeCss`
 - [ ] **THEME-09**: Per-namespace conformance table documented with status: direct preset mapping, vanillify-added, or unsupported
-- [ ] **THEME-10**: Calling `convert()` without `themeCss` produces identical output to v1.0 — fully opt-in
+- [ ] **THEME-10**: Calling `convert()` without `themeCss` produces identical output to v1.0 -- fully opt-in
 
 ## v2 Requirements
 
@@ -66,7 +66,7 @@ Explicitly excluded. Documented to prevent scope creep.
 | `@keyframes` inside `@theme` | UnoCSS handles animations via different mechanism |
 | Auto-discovery of `@theme` from project CSS | Breaks stateless API design; CLI handles file reading |
 | `var()` references inside `@theme` values | Requires resolution context not available statically |
-| Runtime/JIT conversion | Fundamentally different product — vanillify is static/build-time |
+| Runtime/JIT conversion | Fundamentally different product -- vanillify is static/build-time |
 | Semantic class naming | Deferred to v2 (ENH-01, ENH-02) |
 
 ## Traceability
@@ -75,29 +75,29 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| TOOL-01 | — | Pending |
-| TOOL-02 | — | Pending |
-| TOOL-03 | — | Pending |
-| TOOL-04 | — | Pending |
-| TOOL-05 | — | Pending |
-| QUAL-01 | — | Pending |
-| QUAL-02 | — | Pending |
-| THEME-01 | — | Pending |
-| THEME-02 | — | Pending |
-| THEME-03 | — | Pending |
-| THEME-04 | — | Pending |
-| THEME-05 | — | Pending |
-| THEME-06 | — | Pending |
-| THEME-07 | — | Pending |
-| THEME-08 | — | Pending |
-| THEME-09 | — | Pending |
-| THEME-10 | — | Pending |
+| TOOL-01 | Phase 4 | Pending |
+| TOOL-02 | Phase 4 | Pending |
+| TOOL-03 | Phase 4 | Pending |
+| TOOL-04 | Phase 4 | Pending |
+| TOOL-05 | Phase 4 | Pending |
+| QUAL-01 | Phase 5 | Pending |
+| QUAL-02 | Phase 5 | Pending |
+| THEME-01 | Phase 6 | Pending |
+| THEME-02 | Phase 6 | Pending |
+| THEME-03 | Phase 6 | Pending |
+| THEME-04 | Phase 6 | Pending |
+| THEME-05 | Phase 6 | Pending |
+| THEME-06 | Phase 6 | Pending |
+| THEME-07 | Phase 6 | Pending |
+| THEME-08 | Phase 6 | Pending |
+| THEME-09 | Phase 6 | Pending |
+| THEME-10 | Phase 6 | Pending |
 
 **Coverage:**
 - v1.1 requirements: 17 total
-- Mapped to phases: 0
-- Unmapped: 17 ⚠️
+- Mapped to phases: 17
+- Unmapped: 0
 
 ---
 *Requirements defined: 2026-04-05*
-*Last updated: 2026-04-05 after milestone v1.1 definition*
+*Last updated: 2026-04-05 after v1.1 roadmap creation*
