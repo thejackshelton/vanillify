@@ -46,10 +46,10 @@ Requirements for the Tailwind compile() engine migration.
 
 ### Cleanup
 
-- [ ] **CLN-01**: `src/theme/` directory (parser.ts, mapper.ts, types.ts) is deleted — Tailwind handles `@theme` natively
-- [ ] **CLN-02**: `src/variants/` directory (parser.ts, resolver.ts, types.ts) is deleted — Tailwind handles `@custom-variant` natively
-- [ ] **CLN-03**: `@unocss/core` and `@unocss/preset-wind4` are removed from dependencies; `tailwindcss@~4.2.2` is added
-- [ ] **CLN-04**: All Tailwind imports are isolated to a single adapter file (`pipeline/generator.ts`)
+- [x] **CLN-01**: `src/theme/` directory (parser.ts, mapper.ts, types.ts) is deleted — Tailwind handles `@theme` natively
+- [x] **CLN-02**: `src/variants/` directory (parser.ts, resolver.ts, types.ts) is deleted — Tailwind handles `@custom-variant` natively
+- [x] **CLN-03**: `@unocss/core` and `@unocss/preset-wind4` are removed from dependencies; `tailwindcss@~4.2.2` is added
+- [x] **CLN-04**: All Tailwind imports are isolated to a single adapter file (`pipeline/generator.ts`)
 
 ### API Compatibility
 
@@ -109,10 +109,10 @@ Which phases cover which requirements. Updated during roadmap creation.
 | RWR-01 | Phase 10 | Complete |
 | RWR-02 | Phase 10 | Complete |
 | RWR-03 | Phase 10 | Complete |
-| CLN-01 | Phase 11 | Pending |
-| CLN-02 | Phase 11 | Pending |
-| CLN-03 | Phase 11 | Pending |
-| CLN-04 | Phase 11 | Pending |
+| CLN-01 | Phase 11 | Complete |
+| CLN-02 | Phase 11 | Complete |
+| CLN-03 | Phase 11 | Complete |
+| CLN-04 | Phase 11 | Complete |
 | API-01 | Phase 11 | Pending |
 | API-02 | Phase 11 | Pending |
 | API-03 | Phase 11 | Pending |

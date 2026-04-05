@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v2.0
 milestone_name: Tailwind Compile Migration
-status: planning
-stopped_at: Completed 10-01-PLAN.md
-last_updated: "2026-04-05T19:32:27.422Z"
-last_activity: 2026-04-05 -- Roadmap created for v2.0 milestone
+status: verifying
+stopped_at: Completed 11-01-PLAN.md
+last_updated: "2026-04-05T19:53:27.660Z"
+last_activity: 2026-04-05
 progress:
   total_phases: 4
-  completed_phases: 2
-  total_plans: 4
-  completed_plans: 3
-  percent: 75
+  completed_phases: 3
+  total_plans: 6
+  completed_plans: 5
+  percent: 83
 ---
 
 # Project State
@@ -27,8 +27,8 @@ See: .planning/PROJECT.md (updated 2026-04-05)
 
 Phase: 10 of 11 (Pipeline Wiring and Rewriter Adaptation)
 Plan: 2 of 2 (COMPLETE)
-Status: Phase complete
-Last activity: 2026-04-05 -- Completed 10-02 test updates for Tailwind output
+Status: Phase complete — ready for verification
+Last activity: 2026-04-05
 
 Progress: [████████░░] 75%
 
@@ -58,6 +58,7 @@ Progress: [████████░░] 75%
 | Phase 09 P01 | 4min | 2 tasks | 4 files |
 | Phase 10 P01 | 2min | 2 tasks | 2 files |
 | Phase 10 P02 | 3min | 3 tasks | 28 files |
+| Phase 11 P01 | 4min | 2 tasks | 16 files |
 
 ## Accumulated Context
 
@@ -78,6 +79,8 @@ Recent decisions affecting current work:
 - [Phase 10]: Preserve Tailwind nested CSS output as-is -- no flattening, modern browsers support CSS nesting natively
 - [Phase 10]: Migrated all test files from vite-plus/test to vitest -- vite-plus/test was broken
 - [Phase 10]: Added compile error handling in tw-generator for malformed @theme CSS -- graceful fallback instead of crash
+- [Phase 11]: Kept variantsRecordToCss() helper for backward compat with Record<string, string> customVariants
+- [Phase 11]: Single adapter isolation: only pipeline/generator.ts imports from tailwindcss
 
 ### Pending Todos
 
@@ -91,6 +94,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-04-05T19:36:45Z
-Stopped at: Completed 10-02-PLAN.md
+Last session: 2026-04-05T19:53:27.656Z
+Stopped at: Completed 11-01-PLAN.md
 Resume file: None
