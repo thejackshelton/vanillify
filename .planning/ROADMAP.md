@@ -33,7 +33,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 Plans:
 - [x] 01-01-PLAN.md — Project scaffolding, type definitions, and parser module
 - [x] 01-02-PLAN.md — AST class extractor with dynamic expression detection
-- [ ] 01-03-PLAN.md — UnoCSS generator singleton and indexed namer module
+- [x] 01-03-PLAN.md — UnoCSS generator singleton and indexed namer module
 - [ ] 01-04-PLAN.md — Rewriter module, convert() API wiring, and integration tests
 
 **UI hint**: no

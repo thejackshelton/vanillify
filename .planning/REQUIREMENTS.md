@@ -11,18 +11,18 @@ Requirements for initial release. Each maps to roadmap phases.
 
 - [x] **CORE-01**: Library exposes `convert()` function that accepts JSX/TSX source string and returns CSS string + transformed component string in-memory
 - [x] **CORE-02**: oxc-parser extracts class/className attribute values from JSX/TSX AST (not regex)
-- [ ] **CORE-03**: UnoCSS `createGenerator` with `preset-wind4` generates CSS from extracted Tailwind classes
-- [ ] **CORE-04**: Generated CSS uses indexed class names (`.node0`, `.node1`, etc.) assigned per JSX element
-- [ ] **CORE-05**: Output CSS is formatted and readable (not minified)
+- [x] **CORE-03**: UnoCSS `createGenerator` with `preset-wind4` generates CSS from extracted Tailwind classes
+- [x] **CORE-04**: Generated CSS uses indexed class names (`.node0`, `.node1`, etc.) assigned per JSX element
+- [x] **CORE-05**: Output CSS is formatted and readable (not minified)
 - [ ] **CORE-06**: Transformed component replaces Tailwind class strings with generated class names
 - [x] **CORE-07**: Dynamic class expressions (ternaries, template literals, clsx) are detected and warned, not silently skipped
-- [ ] **CORE-08**: Library handles arbitrary Tailwind values (e.g. `text-[#ff0000]`, `w-[calc(100%-1rem)]`)
+- [x] **CORE-08**: Library handles arbitrary Tailwind values (e.g. `text-[#ff0000]`, `w-[calc(100%-1rem)]`)
 
 ### Variants
 
-- [ ] **VARI-01**: Standard pseudo-class variants resolve to CSS pseudo-selectors (hover: → :hover, focus: → :focus, etc.)
-- [ ] **VARI-02**: Responsive breakpoint variants resolve to @media rules (sm:, md:, lg:, xl:, 2xl:)
-- [ ] **VARI-03**: Stacked/compound variants resolve correctly (dark:hover:text-white → nested conditions)
+- [x] **VARI-01**: Standard pseudo-class variants resolve to CSS pseudo-selectors (hover: → :hover, focus: → :focus, etc.)
+- [x] **VARI-02**: Responsive breakpoint variants resolve to @media rules (sm:, md:, lg:, xl:, 2xl:)
+- [x] **VARI-03**: Stacked/compound variants resolve correctly (dark:hover:text-white → nested conditions)
 
 ### Custom Variants
 
@@ -72,15 +72,15 @@ Which phases cover which requirements. Updated during roadmap creation.
 |-------------|-------|--------|
 | CORE-01 | Phase 1 | Complete |
 | CORE-02 | Phase 1 | Complete |
-| CORE-03 | Phase 1 | Pending |
-| CORE-04 | Phase 1 | Pending |
-| CORE-05 | Phase 1 | Pending |
+| CORE-03 | Phase 1 | Complete |
+| CORE-04 | Phase 1 | Complete |
+| CORE-05 | Phase 1 | Complete |
 | CORE-06 | Phase 1 | Pending |
 | CORE-07 | Phase 1 | Complete |
-| CORE-08 | Phase 1 | Pending |
-| VARI-01 | Phase 1 | Pending |
-| VARI-02 | Phase 1 | Pending |
-| VARI-03 | Phase 1 | Pending |
+| CORE-08 | Phase 1 | Complete |
+| VARI-01 | Phase 1 | Complete |
+| VARI-02 | Phase 1 | Complete |
+| VARI-03 | Phase 1 | Complete |
 | CVAR-01 | Phase 2 | Pending |
 | CVAR-02 | Phase 2 | Pending |
 | CVAR-03 | Phase 2 | Pending |
