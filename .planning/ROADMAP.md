@@ -50,7 +50,7 @@ Plans:
 
 Plans:
 - [x] 02-01-PLAN.md — Variant parser, resolver, and types (TDD)
-- [ ] 02-02-PLAN.md — Pipeline wiring and integration tests (TDD)
+- [x] 02-02-PLAN.md — Pipeline wiring and integration tests (TDD)
 
 ### Phase 3: CLI and Package
 **Goal**: The library is published and usable via `npx vanillify` and `import { convert } from 'vanillify'`
