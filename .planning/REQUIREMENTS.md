@@ -1,45 +1,47 @@
 # Requirements: Vanillify
 
-**Defined:** 2026-04-04
+**Defined:** 2026-04-05
 **Core Value:** Accurate, reliable conversion of Tailwind classes to vanilla CSS via UnoCSS's createGenerator
 
-## v1 Requirements
+## v1.0 Requirements (Shipped)
 
-Requirements for initial release. Each maps to roadmap phases.
+All v1.0 requirements completed. See MILESTONES.md for details.
 
-### Core Pipeline
+- ✓ **CORE-01** through **CORE-08**: Core pipeline (convert API, AST extraction, CSS generation, indexed naming, rewriting, dynamic class warnings, arbitrary values)
+- ✓ **VARI-01** through **VARI-03**: Variant resolution (pseudo-class, responsive, stacked)
+- ✓ **CVAR-01** through **CVAR-03**: Custom variant resolution (@custom-variant opt-in)
+- ✓ **CLI-01**, **CLI-02**: CLI wrapper
+- ✓ **PKG-01** through **PKG-03**: Build and package (dual ESM+CJS, typed exports, fixture tests)
 
-- [x] **CORE-01**: Library exposes `convert()` function that accepts JSX/TSX source string and returns CSS string + transformed component string in-memory
-- [x] **CORE-02**: oxc-parser extracts class/className attribute values from JSX/TSX AST (not regex)
-- [x] **CORE-03**: UnoCSS `createGenerator` with `preset-wind4` generates CSS from extracted Tailwind classes
-- [x] **CORE-04**: Generated CSS uses indexed class names (`.node0`, `.node1`, etc.) assigned per JSX element
-- [x] **CORE-05**: Output CSS is formatted and readable (not minified)
-- [x] **CORE-06**: Transformed component replaces Tailwind class strings with generated class names
-- [x] **CORE-07**: Dynamic class expressions (ternaries, template literals, clsx) are detected and warned, not silently skipped
-- [x] **CORE-08**: Library handles arbitrary Tailwind values (e.g. `text-[#ff0000]`, `w-[calc(100%-1rem)]`)
+## v1.1 Requirements
 
-### Variants
+Requirements for Toolchain & Theme Support milestone.
 
-- [x] **VARI-01**: Standard pseudo-class variants resolve to CSS pseudo-selectors (hover: → :hover, focus: → :focus, etc.)
-- [x] **VARI-02**: Responsive breakpoint variants resolve to @media rules (sm:, md:, lg:, xl:, 2xl:)
-- [x] **VARI-03**: Stacked/compound variants resolve correctly (dark:hover:text-white → nested conditions)
+### Toolchain
 
-### Custom Variants
+- [ ] **TOOL-01**: Project uses pnpm as package manager with pnpm-lock.yaml and `packageManager` field in package.json
+- [ ] **TOOL-02**: Single vite.config.ts with `defineConfig` from vite-plus replaces tsdown.config.ts and vitest.config.ts (pack + test blocks)
+- [ ] **TOOL-03**: Package scripts use `vp pack` and `vp test` instead of direct tsdown/vitest commands
+- [ ] **TOOL-04**: vite-plus lint block configured with project lint rules (replaces standalone eslint setup)
+- [ ] **TOOL-05**: vite-plus fmt block configured with project formatting rules
 
-- [x] **CVAR-01**: User can opt-in to custom variant resolution by providing `@custom-variant` CSS definitions
-- [x] **CVAR-02**: Custom variants (e.g. ui-checked, ui-disabled, ui-mixed) resolve to simplified descendant selectors in vanilla CSS output
-- [x] **CVAR-03**: Custom variant resolution does not affect core pipeline when not opted in
+### Code Quality
 
-### CLI
+- [ ] **QUAL-01**: All static regex patterns replaced with magic-regexp (variant parser, generator layer regex, CLI extension matching)
+- [ ] **QUAL-02**: Dynamic regex patterns in rewriter.ts documented as intentionally raw (runtime construction incompatible with magic-regexp)
 
-- [x] **CLI-01**: CLI accepts file paths/globs as input and writes converted files to disk
-- [x] **CLI-02**: CLI wraps the programmatic API (no separate conversion logic)
+### Theme Support
 
-### Build & Package
-
-- [x] **PKG-01**: Library built with tsdown, dual ESM+CJS output
-- [x] **PKG-02**: Library exports typed API via package.json exports field
-- [x] **PKG-03**: Tests run via vitest with fixture-based snapshots (Qwik checkbox example as primary fixture)
+- [ ] **THEME-01**: `convert()` accepts optional `themeCss: string` containing `@theme { ... }` CSS block
+- [ ] **THEME-02**: Parser extracts CSS variable declarations from `@theme` blocks, handling comments, duplicates (last wins), and malformed declarations (warn + skip)
+- [ ] **THEME-03**: Namespace mapper translates `--namespace-name: value` to UnoCSS theme config keys with a tested conformance matrix for preset-wind4@66.6.7
+- [ ] **THEME-04**: Theme config extends preset-wind4 defaults (not replaces) — user's `--color-brand` adds to existing colors, doesn't remove red/blue/etc.
+- [ ] **THEME-05**: Generator cache key includes theme identity so different theme configs produce different generators
+- [ ] **THEME-06**: ConvertResult includes theme CSS (`:root` variable definitions) alongside utility CSS
+- [ ] **THEME-07**: Unknown namespaces are warned but passed through as custom theme keys (not silently dropped)
+- [ ] **THEME-08**: CLI accepts `--theme <file>` flag, reads CSS file, passes contents to library as `themeCss`
+- [ ] **THEME-09**: Per-namespace conformance table documented with status: direct preset mapping, vanillify-added, or unsupported
+- [ ] **THEME-10**: Calling `convert()` without `themeCss` produces identical output to v1.0 — fully opt-in
 
 ## v2 Requirements
 
@@ -50,19 +52,22 @@ Deferred to future release. Tracked but not in current roadmap.
 - **ENH-01**: Semantic class naming via pluggable nameGenerator callback
 - **ENH-02**: Local AI model integration for semantic class naming
 - **ENH-03**: HTML file support (non-JSX inputs)
-- **ENH-04**: Theme block conversion (@theme → CSS custom properties)
-- **ENH-05**: Watch mode for development workflows
-- **ENH-06**: CSS Modules output format option
+- **ENH-04**: Watch mode for development workflows
+- **ENH-05**: CSS Modules output format option
 
 ## Out of Scope
 
+Explicitly excluded. Documented to prevent scope creep.
+
 | Feature | Reason |
 |---------|--------|
+| `@theme { --*: initial }` (theme reset) | Requires full default theme knowledge to reconstruct |
+| `@theme inline { ... }` | No UnoCSS equivalent concept |
+| `@keyframes` inside `@theme` | UnoCSS handles animations via different mechanism |
+| Auto-discovery of `@theme` from project CSS | Breaks stateless API design; CLI handles file reading |
+| `var()` references inside `@theme` values | Requires resolution context not available statically |
 | Runtime/JIT conversion | Fundamentally different product — vanillify is static/build-time |
-| SCSS/Sass output | Flat CSS works everywhere; preprocessor adds no value for this use case |
-| Source maps | No established spec for CSS-from-className transforms |
-| Semantic naming in v1 | Requires intent inference; indexed names are the stable intermediate for AI workflows |
-| Theme support in v1 | Reference implementation's theme handling was problematic; get core right first |
+| Semantic class naming | Deferred to v2 (ENH-01, ENH-02) |
 
 ## Traceability
 
@@ -70,31 +75,29 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| CORE-01 | Phase 1 | Complete |
-| CORE-02 | Phase 1 | Complete |
-| CORE-03 | Phase 1 | Complete |
-| CORE-04 | Phase 1 | Complete |
-| CORE-05 | Phase 1 | Complete |
-| CORE-06 | Phase 1 | Complete |
-| CORE-07 | Phase 1 | Complete |
-| CORE-08 | Phase 1 | Complete |
-| VARI-01 | Phase 1 | Complete |
-| VARI-02 | Phase 1 | Complete |
-| VARI-03 | Phase 1 | Complete |
-| CVAR-01 | Phase 2 | Complete |
-| CVAR-02 | Phase 2 | Complete |
-| CVAR-03 | Phase 2 | Complete |
-| CLI-01 | Phase 3 | Complete |
-| CLI-02 | Phase 3 | Complete |
-| PKG-01 | Phase 3 | Complete |
-| PKG-02 | Phase 3 | Complete |
-| PKG-03 | Phase 3 | Complete |
+| TOOL-01 | — | Pending |
+| TOOL-02 | — | Pending |
+| TOOL-03 | — | Pending |
+| TOOL-04 | — | Pending |
+| TOOL-05 | — | Pending |
+| QUAL-01 | — | Pending |
+| QUAL-02 | — | Pending |
+| THEME-01 | — | Pending |
+| THEME-02 | — | Pending |
+| THEME-03 | — | Pending |
+| THEME-04 | — | Pending |
+| THEME-05 | — | Pending |
+| THEME-06 | — | Pending |
+| THEME-07 | — | Pending |
+| THEME-08 | — | Pending |
+| THEME-09 | — | Pending |
+| THEME-10 | — | Pending |
 
 **Coverage:**
-- v1 requirements: 19 total
-- Mapped to phases: 19
-- Unmapped: 0 ✓
+- v1.1 requirements: 17 total
+- Mapped to phases: 0
+- Unmapped: 17 ⚠️
 
 ---
-*Requirements defined: 2026-04-04*
-*Last updated: 2026-04-04 after roadmap creation*
+*Requirements defined: 2026-04-05*
+*Last updated: 2026-04-05 after milestone v1.1 definition*
