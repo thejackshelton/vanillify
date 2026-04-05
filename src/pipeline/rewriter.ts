@@ -1,6 +1,12 @@
+import { createRegExp, exactly, maybe } from "magic-regexp";
 import type { NodeEntry, OutputFormat, Warning } from "../types";
 import type { NameMap } from "./namer";
 import { twGenerateCSS } from "./generator";
+
+/** Matches .ts, .tsx, .js, .jsx file extensions at end of string */
+const FILE_EXT_RE = createRegExp(
+  exactly(".").and(exactly("ts").or(exactly("js"))).and(maybe(exactly("x"))).at.lineEnd(),
+);
 
 export interface RewriteResult {
   /** Source with className values replaced by indexed names */
@@ -120,7 +126,7 @@ export async function rewrite(
  * Placed after the last existing import statement, or at the top if none exist.
  */
 function prependModuleImport(source: string, filename: string): string {
-  const baseName = filename.replace(/\.(tsx?|jsx?)$/, '');
+  const baseName = filename.replace(FILE_EXT_RE, '');
   const importPath = './' + baseName + '.module.css';
   const importLine = `import styles from '${importPath}';`;
 
