@@ -36,7 +36,9 @@ function extractLayers(output: string): {
   themeCss: string;
   utilityCss: string;
 } {
-  // Theme layer: @layer theme { :root, :host { ... } }
+  // Theme layer regex: matches @layer theme { ... } with non-greedy [\s\S]*? and
+  // positive lookahead (?=@layer) to stop before the next layer block.
+  // RATIONALE: stays raw -- magic-regexp lacks lookahead support and [\s\S] non-greedy quantifiers.
   const themeMatch = output.match(/@layer theme \{([\s\S]*?)\}\s*(?=@layer)/);
   const themeCss = themeMatch ? themeMatch[1].trim() : "";
 
@@ -82,6 +84,10 @@ function extractLayers(output: string): {
  * - Generic `\\X` → `X`
  */
 function unescapeCssSelector(escaped: string): string {
+  // CSS unescape regex: matches hex escape sequences (\HHHHHH + optional space) OR
+  // single-char escapes (\X). Used in .replace() callback with capture group references.
+  // RATIONALE: stays raw -- backreference capture groups in alternation with hex ranges
+  // and quantifier limits ({1,6}) cannot be expressed in magic-regexp.
   return escaped.replace(/\\([0-9a-fA-F]{1,6})\s?|\\(.)/g, (_, hex, ch) => {
     if (hex) return String.fromCodePoint(parseInt(hex, 16));
     return ch;
@@ -97,6 +103,12 @@ function detectMatches(
   // Numeric escapes include a mandatory space: \32 xl means char 0x32 ('2') + 'xl'.
   // We capture from the leading dot up to the opening brace, handling escaped
   // characters as single units so escaped commas/braces don't terminate prematurely.
+  // Selector extraction regex: matches CSS class selectors handling escaped characters
+  // (hex escapes \HHHHHH, single-char escapes \X) and stops at opening brace.
+  // Non-capturing groups, character class exclusions, and hex range quantifiers.
+  // RATIONALE: stays raw -- nested alternation within character groups, hex range
+  // quantifiers ({1,6}), and non-capturing groups with non-greedy modifiers exceed
+  // magic-regexp's expressive capability.
   const selectorRe = /^\s*\.((?:\\[0-9a-fA-F]{1,6}\s?|\\.|[^{,\s])*)\s*(?:,.*?)?\s*\{/gm;
   const generated = new Set<string>();
   let m;
