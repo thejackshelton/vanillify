@@ -38,8 +38,7 @@ export interface RewriteResult {
  * @param entries - NodeEntry[] from extractor
  * @param nameMap - NameMap from namer
  * @param extractWarnings - Warnings from extraction phase
- * @param customVariantsCss - Optional CSS string with @custom-variant directives
- * @param themeCss - Optional CSS string with @theme block
+ * @param css - Optional CSS string with @custom-variant and/or @theme directives
  * @param outputFormat - Output format ('vanilla' or 'css-modules')
  * @param filename - Original filename for CSS Modules import path
  * @returns RewriteResult with transformed component, CSS, and all warnings
@@ -49,8 +48,7 @@ export async function rewrite(
   entries: NodeEntry[],
   nameMap: NameMap,
   extractWarnings: Warning[],
-  customVariantsCss?: string,
-  themeCss?: string,
+  css?: string,
   outputFormat?: OutputFormat,
   filename?: string,
 ): Promise<RewriteResult> {
@@ -65,7 +63,7 @@ export async function rewrite(
     if (!name) continue;
 
     const tokens = new Set(entry.classNames);
-    const result = await twGenerateCSS(tokens, customVariantsCss, themeCss);
+    const result = await twGenerateCSS(tokens, css);
 
     // Collect unmatched warnings
     allWarnings.push(...result.warnings);
@@ -116,9 +114,9 @@ export async function rewrite(
     }
   }
 
-  const css = cssBlocks.join("\n\n");
+  const outputCss = cssBlocks.join("\n\n");
 
-  return { component, css, themeCss: resultThemeCss, warnings: allWarnings, classMap };
+  return { component, css: outputCss, themeCss: resultThemeCss, warnings: allWarnings, classMap };
 }
 
 /**

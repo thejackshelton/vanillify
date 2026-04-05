@@ -94,11 +94,10 @@ describe("ENG-04: compiler caching", () => {
     await twGenerateCSS(new Set(["flex"]));
     await twGenerateCSS(
       new Set(["flex"]),
-      undefined,
       "@theme { --color-brand: #ff0000; }",
     );
 
-    // Different CSS input due to themeCss -- two compilers cached
+    // Different CSS input due to css param -- two compilers cached
     expect(_cache.size).toBe(2);
   });
 
@@ -129,7 +128,6 @@ describe("ENG-05: CSS layer separation", () => {
   it("handles @theme block input", async () => {
     const result = await twGenerateCSS(
       new Set(["bg-brand"]),
-      undefined,
       "@theme { --color-brand: #ff0000; }",
     );
 

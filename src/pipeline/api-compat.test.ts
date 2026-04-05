@@ -49,9 +49,9 @@ describe("API backward compatibility (Phase 11)", () => {
     expect(result.warnings).toHaveLength(0);
   });
 
-  it("API-02: customVariants as CSS string resolves custom variants", async () => {
+  it("API-02: css option with @custom-variant resolves custom variants", async () => {
     const result = await convert(VARIANT_JSX, "test.tsx", {
-      customVariants: "@custom-variant ui-checked (&:checked);",
+      css: "@custom-variant ui-checked (&:checked);",
     });
 
     // Should produce CSS with :checked selector
@@ -64,18 +64,9 @@ describe("API backward compatibility (Phase 11)", () => {
     expect(unmatchedWarnings).toHaveLength(0);
   });
 
-  it("API-02: customVariants as Record resolves custom variants", async () => {
-    const result = await convert(VARIANT_JSX, "test.tsx", {
-      customVariants: { "ui-checked": "&:checked" },
-    });
-
-    // Record form should also produce CSS with :checked selector
-    expect(result.css).toContain(":checked");
-  });
-
-  it("API-03: themeCss with @theme block resolves theme utilities", async () => {
+  it("API-03: css option with @theme block resolves theme utilities", async () => {
     const result = await convert(THEME_JSX, "test.tsx", {
-      themeCss: "@theme { --color-brand: #ff0000; }",
+      css: "@theme { --color-brand: #ff0000; }",
     });
 
     // Should resolve bg-brand to CSS with background-related property
@@ -88,26 +79,20 @@ describe("API backward compatibility (Phase 11)", () => {
     expect(unmatchedWarnings).toHaveLength(0);
   });
 
-  it("API-03: themeCss with bare declarations resolves theme utilities", async () => {
-    const result = await convert(THEME_JSX, "test.tsx", {
-      themeCss: "--color-brand: #ff0000;",
+  it("API-03: css option with combined @theme and @custom-variant", async () => {
+    const result = await convert(VARIANT_JSX, "test.tsx", {
+      css: `
+        @theme { --color-brand: #ff0000; }
+        @custom-variant ui-checked (&:checked);
+      `,
     });
 
-    // Bare declarations may or may not be auto-wrapped in @theme {}.
-    // If Tailwind requires @theme wrapper, this test documents the limitation.
-    // Check if it resolves or produces an unmatched warning.
+    // Both @theme and @custom-variant should be processed
+    expect(result.css).toContain(":checked");
     const unmatchedWarnings = result.warnings.filter(
       (w) => w.type === "unmatched-class",
     );
-
-    if (unmatchedWarnings.length > 0) {
-      // Bare declarations are NOT auto-wrapped -- document this limitation
-      // The test still passes: it documents current behavior
-      expect(unmatchedWarnings.some((w) => w.message.includes("bg-brand"))).toBe(true);
-    } else {
-      // Bare declarations ARE auto-wrapped -- verify CSS output
-      expect(result.css).toMatch(/background|bg/);
-    }
+    expect(unmatchedWarnings).toHaveLength(0);
   });
 
   it("API-04: unmatched class produces warning", async () => {

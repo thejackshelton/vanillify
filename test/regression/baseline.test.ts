@@ -79,7 +79,7 @@ describe("regression baseline - custom variant single", () => {
   it("captures css and component output", async () => {
     const source = `<div className="bg-blue-500 ui-checked:bg-green-500">test</div>`;
     const result = await convert(source, "test.tsx", {
-      customVariants: "@custom-variant ui-checked (&[ui-checked]);",
+      css: "@custom-variant ui-checked (&[ui-checked]);",
     });
 
     await expect(result.css).toMatchFileSnapshot(
@@ -95,7 +95,7 @@ describe("regression baseline - custom variants QDS pattern", () => {
   it("captures css and component output", async () => {
     const source = `<div className="ui-checked:bg-blue-500 ui-disabled:opacity-50 ui-mixed:bg-purple-500">test</div>`;
     const result = await convert(source, "test.tsx", {
-      customVariants: `
+      css: `
         @custom-variant ui-checked (&[ui-checked]);
         @custom-variant ui-disabled (&[ui-disabled]);
         @custom-variant ui-mixed (&[ui-mixed]);
@@ -115,7 +115,7 @@ describe("regression baseline - custom variant stacked with hover", () => {
   it("captures css and component output", async () => {
     const source = `<button className="ui-checked:hover:bg-blue-700">click</button>`;
     const result = await convert(source, "test.tsx", {
-      customVariants: { "ui-checked": "&[ui-checked]" },
+      css: "@custom-variant ui-checked (&[ui-checked]);",
     });
 
     await expect(result.css).toMatchFileSnapshot(
@@ -131,7 +131,7 @@ describe("regression baseline - theme input", () => {
   it("captures css, component, and themeCss output", async () => {
     const source = `<div className="bg-brand p-4">hi</div>`;
     const result = await convert(source, "test.tsx", {
-      themeCss: "@theme { --color-brand: #ff0000; }",
+      css: "@theme { --color-brand: #ff0000; }",
     });
 
     await expect(result.css).toMatchFileSnapshot(
@@ -172,7 +172,7 @@ describe("regression baseline - full checkbox fixture", () => {
       "utf-8",
     );
     const result = await convert(source, "checkbox.tsx", {
-      customVariants: `
+      css: `
         @custom-variant ui-checked (&[ui-checked]);
         @custom-variant ui-disabled (&[ui-disabled]);
         @custom-variant ui-mixed (&[ui-mixed]);
@@ -240,7 +240,7 @@ describe("regression baseline - theme warning paths", () => {
   it("captures malformed theme declaration warnings", async () => {
     const source = `<div className="flex p-4">test</div>`;
     const result = await convert(source, "test.tsx", {
-      themeCss: "@theme { not-a-declaration; }",
+      css: "@theme { not-a-declaration; }",
     });
 
     await expect(JSON.stringify(result.warnings, null, 2)).toMatchFileSnapshot(
@@ -251,7 +251,7 @@ describe("regression baseline - theme warning paths", () => {
   it("captures unsupported theme reset warnings", async () => {
     const source = `<div className="flex p-4">test</div>`;
     const result = await convert(source, "test.tsx", {
-      themeCss: "@theme { --color-brand: initial; }",
+      css: "@theme { --color-brand: initial; }",
     });
 
     await expect(JSON.stringify(result.warnings, null, 2)).toMatchFileSnapshot(
@@ -262,7 +262,7 @@ describe("regression baseline - theme warning paths", () => {
   it("captures unknown theme namespace warnings", async () => {
     const source = `<div className="flex">hi</div>`;
     const result = await convert(source, "test.tsx", {
-      themeCss: "@theme { --unknown-thing: value; }",
+      css: "@theme { --unknown-thing: value; }",
     });
 
     await expect(JSON.stringify(result.warnings, null, 2)).toMatchFileSnapshot(

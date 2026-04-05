@@ -36,9 +36,7 @@ export interface Warning {
   type:
     | "dynamic-class"
     | "unmatched-class"
-    | "theme-parse-error"
-    | "unknown-theme-namespace"
-    | "unsupported-theme-reset";
+    | "theme-parse-error";
   message: string;
   location: { line: number; column: number };
 }

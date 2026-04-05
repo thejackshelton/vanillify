@@ -144,14 +144,12 @@ export interface TwGenerateCSSResult {
  * native compile().build() API.
  *
  * @param tokens - Set of Tailwind class tokens to generate CSS for
- * @param customVariantsCss - Optional CSS string with @custom-variant directives
- * @param themeCss - Optional CSS string with @theme block
+ * @param css - Optional CSS string with @custom-variant, @theme, or other Tailwind directives
  * @returns TwGenerateCSSResult with CSS string, theme CSS, and match info
  */
 export async function twGenerateCSS(
   tokens: Set<string>,
-  customVariantsCss?: string,
-  themeCss?: string,
+  css?: string,
 ): Promise<TwGenerateCSSResult> {
   // Early return for empty token set
   if (tokens.size === 0) {
@@ -166,8 +164,7 @@ export async function twGenerateCSS(
 
   // Build CSS input [ENG-03: source(none) prevents file scanning]
   const parts: string[] = ['@import "tailwindcss" source(none);'];
-  if (themeCss) parts.push(themeCss);
-  if (customVariantsCss) parts.push(customVariantsCss);
+  if (css) parts.push(css);
   const cssInput = parts.join("\n");
 
   // Fresh compile() per call to avoid cumulative build() state leaking

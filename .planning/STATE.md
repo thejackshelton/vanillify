@@ -91,11 +91,15 @@ None yet.
 ### Blockers/Concerns
 
 - compile() is not a public Tailwind API -- pin version tightly, isolate to one adapter file
-- Rewriter (448 lines) was hand-tuned to UnoCSS output format -- high risk of subtle mismatches with Tailwind output
-- Per-node isolation via fresh compile() needs benchmarking for performance
+
+### Quick Tasks Completed
+
+| # | Description | Date | Commit | Directory |
+|---|-------------|------|--------|-----------|
+| 260405-kwh | Convert remaining raw regex to magic-regexp | 2026-04-05 | 67bfb1c | [260405-kwh-convert-remaining-raw-regex-to-magic-reg](./quick/260405-kwh-convert-remaining-raw-regex-to-magic-reg/) |
 
 ## Session Continuity
 
-Last session: 2026-04-05T19:56:18.709Z
-Stopped at: Completed 11-02-PLAN.md
+Last session: 2026-04-05
+Stopped at: Quick task 260405-kwh complete
 Resume file: None
