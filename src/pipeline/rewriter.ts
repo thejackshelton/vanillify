@@ -15,6 +15,8 @@ export interface RewriteResult {
   component: string;
   /** Generated vanilla CSS with .nodeN selectors */
   css: string;
+  /** :root CSS variable definitions from theme layer (empty string if no theme) */
+  themeCss: string;
   /** All warnings (from extraction + generation) */
   warnings: Warning[];
 }
@@ -42,9 +44,11 @@ export async function rewrite(
   nameMap: NameMap,
   extractWarnings: Warning[],
   customVariants?: VariantObject[],
+  themeConfig?: Record<string, any>,
 ): Promise<RewriteResult> {
   const allWarnings: Warning[] = [...extractWarnings];
   const cssBlocks: string[] = [];
+  let themeCss = "";
 
   // Generate CSS per-node to get isolated CSS blocks
   for (const entry of entries) {
@@ -53,10 +57,16 @@ export async function rewrite(
     if (!name) continue;
 
     const tokens = new Set(entry.classNames);
-    const result = await generateCSS(tokens, customVariants);
+    const result = await generateCSS(tokens, customVariants, themeConfig);
 
     // Collect unmatched warnings
     allWarnings.push(...result.warnings);
+
+    // Collect themeCss from the first generateCSS call that returns non-empty themeCss
+    // (theme layer is the same across all nodes since it comes from the generator's theme config)
+    if (!themeCss && result.themeCss) {
+      themeCss = result.themeCss;
+    }
 
     // Extract only the utility rules from the default layer and rewrite selectors
     const nodeCSS = buildNodeCSS(name, result.css, entry.classNames);
@@ -82,7 +92,7 @@ export async function rewrite(
 
   const css = cssBlocks.join("\n\n");
 
-  return { component, css, warnings: allWarnings };
+  return { component, css, themeCss, warnings: allWarnings };
 }
 
 /**

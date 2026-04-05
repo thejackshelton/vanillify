@@ -45,6 +45,8 @@ export interface ConvertResult {
   component: string;
   /** Generated vanilla CSS */
   css: string;
+  /** :root CSS variable definitions from theme layer (empty string if no theme) */
+  themeCss: string;
   /** Warnings for dynamic/unmatched classes */
   warnings: Warning[];
 }

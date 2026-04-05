@@ -1,3 +1,23 @@
+// CONFORMANCE TABLE (preset-wind4@66.6.7)
+// Status: direct = tested direct mapping, inferred = follows pattern but untested
+// --color-*       -> theme.colors.*      [direct]
+// --font-*        -> theme.font.*        [direct]
+// --font-weight-* -> theme.fontWeight.*  [direct]
+// --text-*        -> theme.text.*        [direct, special: { fontSize }]
+// --tracking-*    -> theme.tracking.*    [direct]
+// --leading-*     -> theme.leading.*     [direct]
+// --spacing-*     -> theme.spacing.*     [direct]
+// --radius-*      -> theme.radius.*      [direct]
+// --shadow-*      -> theme.shadow.*      [direct]
+// --inset-shadow-* -> theme.insetShadow.* [inferred]
+// --drop-shadow-* -> theme.dropShadow.*  [direct]
+// --blur-*        -> theme.blur.*        [direct]
+// --ease-*        -> theme.ease.*        [direct]
+// --breakpoint-*  -> theme.breakpoint.*  [direct]
+// --perspective-* -> theme.perspective.* [inferred]
+// --animate-*     -> theme.animation.*   [inferred, complex structure]
+// --container-*   -> theme.container.*   [inferred]
+
 import type { Warning } from "../types";
 import type { ThemeDeclaration, ThemeMapResult } from "./types";
 

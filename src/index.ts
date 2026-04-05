@@ -3,7 +3,9 @@ import { extract } from "./pipeline/extractor";
 import { assignNames } from "./pipeline/namer";
 import { rewrite } from "./pipeline/rewriter";
 import { resolveCustomVariants } from "./variants/resolver";
-import type { ConvertOptions, ConvertResult } from "./types";
+import { parseThemeCss } from "./theme/parser";
+import { mapToThemeConfig } from "./theme/mapper";
+import type { ConvertOptions, ConvertResult, Warning } from "./types";
 
 /**
  * Convert a JSX/TSX source file from Tailwind classes to vanilla CSS.
@@ -40,10 +42,27 @@ export async function convert(
     ? resolveCustomVariants(options.customVariants)
     : undefined;
 
-  // 5. Rewrite source and generate per-node CSS
-  const result = await rewrite(source, entries, nameMap, extractWarnings, variantObjects);
+  // 5. Parse theme CSS if provided
+  let themeConfig: Record<string, any> | undefined;
+  const themeWarnings: Warning[] = [];
 
-  return result;
+  if (options?.themeCss) {
+    const parseResult = parseThemeCss(options.themeCss);
+    themeWarnings.push(...parseResult.warnings);
+    const mapResult = mapToThemeConfig(parseResult.declarations);
+    themeWarnings.push(...mapResult.warnings);
+    themeConfig = mapResult.theme;
+  }
+
+  // 6. Rewrite source and generate per-node CSS
+  const result = await rewrite(source, entries, nameMap, extractWarnings, variantObjects, themeConfig);
+
+  return {
+    component: result.component,
+    css: result.css,
+    themeCss: result.themeCss ?? "",
+    warnings: [...themeWarnings, ...result.warnings],
+  };
 }
 
 export type { ConvertOptions, ConvertResult, Warning, NodeEntry } from "./types";
