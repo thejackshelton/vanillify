@@ -150,7 +150,7 @@ Plans:
 - [ ] **Phase 8: Regression Test Baseline** - Snapshot current convert() output for all fixtures before any engine changes
 - [ ] **Phase 9: Tailwind Adapter Module** - Build compile().build() integration with loadStylesheet, caching, and CSS layer separation
 - [x] **Phase 10: Pipeline Wiring and Rewriter Adaptation** - Wire adapter into pipeline, adapt rewriter to Tailwind CSS output, verify regression parity (completed 2026-04-05)
-- [ ] **Phase 11: Cleanup and API Verification** - Delete theme/variant translation layers, remove UnoCSS deps, verify public API backward compatibility
+- [x] **Phase 11: Cleanup and API Verification** - Delete theme/variant translation layers, remove UnoCSS deps, verify public API backward compatibility (completed 2026-04-05)
 
 ## Phase Details
 
@@ -208,11 +208,11 @@ Plans:
   3. All Tailwind imports exist in exactly one file (`pipeline/generator.ts`) -- no other source file imports from `tailwindcss`
   4. `convert()` called without options produces identical behavior to v1.x -- the default path is fully backward compatible
   5. `convert()` with `customVariants` (CSS string) and `themeCss` (CSS string or `@theme {}` block) produces correct output via native Tailwind processing
-**Plans:** 1/2 plans executed
+**Plans:** 2/2 plans complete
 
 Plans:
 - [x] 11-01-PLAN.md -- Delete dead UnoCSS code, remove dependencies, rename Tailwind adapter to canonical generator.ts
-- [ ] 11-02-PLAN.md -- API backward compatibility test suite
+- [x] 11-02-PLAN.md -- API backward compatibility test suite
 
 ## Progress
 
@@ -231,4 +231,4 @@ Phases execute in numeric order: 8 -> 9 -> 10 -> 11
 | 8. Regression Test Baseline | v2.0 | 1/1 | Complete | - |
 | 9. Tailwind Adapter Module | v2.0 | 0/1 | Not started | - |
 | 10. Pipeline Wiring and Rewriter Adaptation | v2.0 | 2/2 | Complete   | 2026-04-05 |
-| 11. Cleanup and API Verification | v2.0 | 1/2 | In Progress|  |
+| 11. Cleanup and API Verification | v2.0 | 2/2 | Complete   | 2026-04-05 |

@@ -53,10 +53,10 @@ Requirements for the Tailwind compile() engine migration.
 
 ### API Compatibility
 
-- [ ] **API-01**: `ConvertOptions` and `ConvertResult` types preserve their existing shape — engine swap is internal
-- [ ] **API-02**: `customVariants` accepts CSS string input and produces correct output via native Tailwind processing
-- [ ] **API-03**: `themeCss` accepts CSS string input (bare declarations or `@theme {}` blocks) and produces correct output
-- [ ] **API-04**: Calling `convert()` without options produces identical behavior to v1.x (fully backward compatible default path)
+- [x] **API-01**: `ConvertOptions` and `ConvertResult` types preserve their existing shape — engine swap is internal
+- [x] **API-02**: `customVariants` accepts CSS string input and produces correct output via native Tailwind processing
+- [x] **API-03**: `themeCss` accepts CSS string input (bare declarations or `@theme {}` blocks) and produces correct output
+- [x] **API-04**: Calling `convert()` without options produces identical behavior to v1.x (fully backward compatible default path)
 
 ## Future Requirements
 
@@ -113,10 +113,10 @@ Which phases cover which requirements. Updated during roadmap creation.
 | CLN-02 | Phase 11 | Complete |
 | CLN-03 | Phase 11 | Complete |
 | CLN-04 | Phase 11 | Complete |
-| API-01 | Phase 11 | Pending |
-| API-02 | Phase 11 | Pending |
-| API-03 | Phase 11 | Pending |
-| API-04 | Phase 11 | Pending |
+| API-01 | Phase 11 | Complete |
+| API-02 | Phase 11 | Complete |
+| API-03 | Phase 11 | Complete |
+| API-04 | Phase 11 | Complete |
 
 **Coverage:**
 - v2.0 requirements: 19 total
