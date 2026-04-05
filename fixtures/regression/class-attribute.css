@@ -1,0 +1,12 @@
+.node0 {
+  display:flex;
+  gap:calc(var(--spacing) * 2);
+  align-items:center;
+}
+
+.node1 {
+  font-size:var(--text-sm-fontSize);
+  line-height:var(--un-leading, var(--text-sm-lineHeight));
+  --un-font-weight:var(--fontWeight-semibold);
+  font-weight:var(--fontWeight-semibold);
+}

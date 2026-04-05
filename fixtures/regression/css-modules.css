@@ -1,0 +1,12 @@
+.node0 {
+  padding:calc(var(--spacing) * 4);
+  display:flex;
+  align-items:center;
+}
+
+.node1 {
+  font-size:var(--text-sm-fontSize);
+  line-height:var(--un-leading, var(--text-sm-lineHeight));
+  --un-font-weight:var(--fontWeight-bold);
+  font-weight:var(--fontWeight-bold);
+}

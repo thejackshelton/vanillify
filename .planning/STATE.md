@@ -1,17 +1,17 @@
 ---
 gsd_state_version: 1.0
-milestone: v1.1
-milestone_name: Toolchain & Theme Support
+milestone: v2.0
+milestone_name: Tailwind Compile Migration
 status: planning
-stopped_at: Roadmap created for v1.1 milestone (Phases 4-6)
-last_updated: "2026-04-05T16:17:41.577Z"
+stopped_at: Defining requirements for v2.0 milestone
+last_updated: "2026-04-05"
 last_activity: 2026-04-05
 progress:
-  total_phases: 4
-  completed_phases: 2
-  total_plans: 10
-  completed_plans: 7
-  percent: 70
+  total_phases: 0
+  completed_phases: 0
+  total_plans: 0
+  completed_plans: 0
+  percent: 0
 ---
 
 # Project State
@@ -20,17 +20,15 @@ progress:
 
 See: .planning/PROJECT.md (updated 2026-04-05)
 
-**Core value:** Accurate, reliable conversion of Tailwind classes to vanilla CSS via UnoCSS's createGenerator
-**Current focus:** Phase 4 - Toolchain Foundation
+**Core value:** Accurate, reliable conversion of Tailwind classes to vanilla CSS — now powered by Tailwind's native compile().build() API
+**Current focus:** Defining requirements for v2.0
 
 ## Current Position
 
-Phase: 07 of 6 (Toolchain Foundation)
-Plan: Not started
-Status: Ready to plan
-Last activity: 2026-04-05
-
-Progress: [========......] 53% (8 plans complete across v1.0, v1.1 starting)
+Phase: Not started (defining requirements)
+Plan: —
+Status: Defining requirements
+Last activity: 2026-04-05 — Milestone v2.0 started
 
 ## Performance Metrics
 

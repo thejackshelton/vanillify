@@ -1,0 +1,6 @@
+.node0 {
+  color:color-mix(in oklab, #ff0000 var(--un-text-opacity), transparent);
+  padding:1.5rem;
+  background-color:color-mix(in oklab, rgb(0,128,255) var(--un-bg-opacity), transparent);
+  width:200px;
+}

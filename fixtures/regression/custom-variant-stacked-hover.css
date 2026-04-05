@@ -1,0 +1,9 @@
+.node0:hover[ui-checked] {
+  background-color:color-mix(in srgb, var(--colors-blue-700) var(--un-bg-opacity), transparent);
+}
+
+@supports (color: color-mix(in lab, red, red)){
+.node0:hover[ui-checked] {
+  background-color:color-mix(in oklab, var(--colors-blue-700) var(--un-bg-opacity), transparent);
+}
+}

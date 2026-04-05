@@ -12,7 +12,7 @@ Accurate, reliable conversion of Tailwind classes to vanilla CSS — powered by 
 
 ### Validated
 
-<!-- Shipped and confirmed valuable in v1.0 -->
+<!-- Shipped and confirmed valuable -->
 
 - ✓ Programmatic API: `import { convert } from 'vanillify'` — v1.0/Phase 1
 - ✓ CLI wrapper: `npx vanillify <files>` — v1.0/Phase 3
@@ -24,29 +24,35 @@ Accurate, reliable conversion of Tailwind classes to vanilla CSS — powered by 
 - ✓ Opt-in custom variant resolution (`@custom-variant`) — v1.0/Phase 2
 - ✓ Framework-agnostic JSX/TSX parsing — v1.0/Phase 1
 - ✓ Dual ESM+CJS build with typed exports — v1.0/Phase 3
+- ✓ Tailwind v4 `@theme` block support — v1.1/Phase 6
+- ✓ CSS Modules output format (`--format css-modules`) — v1.1/Phase 7
+- ✓ `--theme` CLI flag for theme CSS files — v1.1/Phase 6
 
 ### Active
 
-- [ ] Migrate build/test/lint/fmt to unified vite-plus `defineConfig` (replace separate tsdown/vitest configs)
-- [ ] Switch package manager from npm to pnpm
-- [ ] Replace all regex patterns with magic-regexp for readability and safety
-- [ ] Tailwind v4 `@theme` block support — resolve theme-defined classes to correct CSS output (approach TBD: preset-wind4 native vs oxc-parser fallback)
+- [ ] Replace UnoCSS engine (`@unocss/core` + `preset-wind4`) with Tailwind v4's native `compile().build()` API
+- [ ] Delete custom theme translation layer (`src/theme/`) — Tailwind handles `@theme` natively
+- [ ] Delete custom variant translation layer (`src/variants/`) — Tailwind handles `@custom-variant` natively
+- [ ] Simplify `pipeline/generator.ts` to a thin Tailwind adapter (~170 lines → ~40-50 lines)
+- [ ] Preserve public API shape (`ConvertOptions`/`ConvertResult`) — engine swap is internal
+- [ ] Add regression tests before migration (theme fixture through `convert()`, unmatched warnings, etc.)
 
 ### Out of Scope
 
 - Semantic class naming (future: local AI model integration for naming)
-- CSS Modules output format — vanilla CSS only
 - Runtime/JIT conversion — this is a build-time/static tool
 
-## Current Milestone: v1.1 Toolchain & Theme Support
+## Current Milestone: v2.0 Tailwind Compile Migration
 
-**Goal:** Modernize the build toolchain to vite-plus, adopt magic-regexp for all pattern matching, and add Tailwind v4 theme support.
+**Goal:** Replace UnoCSS engine with Tailwind v4's native `compile().build()` API, delete custom translation layers, and simplify the codebase while preserving the public API.
 
 **Target features:**
-- Migrate build/test/lint/fmt config to unified vite-plus `defineConfig`
-- Switch from npm to pnpm
-- Replace all regex with magic-regexp
-- Tailwind v4 `@theme` block support (approach TBD pending research)
+- Swap `@unocss/core` + `preset-wind4` for Tailwind's `compile().build()` API
+- Delete `theme/` directory — Tailwind handles `@theme` natively
+- Delete `variants/` directory — Tailwind handles `@custom-variant` natively
+- Simplify generator to thin Tailwind adapter
+- Preserve `ConvertOptions`/`ConvertResult` public API shape
+- Design as thin wrapper — Tailwind API changes require updating one file
 
 ## Context
 
@@ -68,11 +74,12 @@ Accurate, reliable conversion of Tailwind classes to vanilla CSS — powered by 
 
 | Decision | Rationale | Outcome |
 |----------|-----------|---------|
-| UnoCSS `createGenerator` over Tailwind CLI | Gives us programmatic access to CSS generation, no need to shell out or run full Tailwind build | — Pending |
-| `oxc-parser` over regex-based parsing | Proper AST means correct class extraction from any JSX/TSX, handles edge cases the regex approach misses | — Pending |
-| Indexed class names as default | Simple, predictable, easy for downstream tooling (AI naming) to post-process | — Pending |
-| No theme support in v1 | The reference implementation's theme handling was problematic; deferring to get core conversion right first | — Pending |
-| Custom variants as descendant selectors | QDS's scoped attribute variants (`[ui-qds-scope][ui-checked] > &`) simplify to descendant selectors in vanilla CSS since scoping is unnecessary | — Pending |
+| UnoCSS `createGenerator` over Tailwind CLI | Gives us programmatic access to CSS generation, no need to shell out or run full Tailwind build | ⚠️ Revisit — migrating to Tailwind's native `compile().build()` in v2.0 |
+| `oxc-parser` over regex-based parsing | Proper AST means correct class extraction from any JSX/TSX, handles edge cases the regex approach misses | ✓ Good |
+| Indexed class names as default | Simple, predictable, easy for downstream tooling (AI naming) to post-process | ✓ Good |
+| No theme support in v1 | The reference implementation's theme handling was problematic; deferring to get core conversion right first | ✓ Good — shipped in v1.1, migrating to native Tailwind in v2.0 |
+| Custom variants as descendant selectors | QDS's scoped attribute variants (`[ui-qds-scope][ui-checked] > &`) simplify to descendant selectors in vanilla CSS since scoping is unnecessary | ✓ Good |
+| Tailwind `compile().build()` over UnoCSS | Native Tailwind engine = 100% fidelity, no preset-wind4 gaps, native `@theme` and `@custom-variant` support. Deletes 6 files of translation code. | — Pending (v2.0) |
 
 ## Evolution
 
@@ -92,4 +99,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-04-05 after milestone v1.1 started*
+*Last updated: 2026-04-05 after milestone v2.0 started*

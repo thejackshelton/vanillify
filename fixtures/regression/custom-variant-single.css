@@ -1,0 +1,16 @@
+.node0 {
+  background-color:color-mix(in srgb, var(--colors-blue-500) var(--un-bg-opacity), transparent);
+}
+
+.node0[ui-checked] {
+  background-color:color-mix(in srgb, var(--colors-green-500) var(--un-bg-opacity), transparent);
+}
+
+@supports (color: color-mix(in lab, red, red)){
+.node0[ui-checked] {
+  background-color:color-mix(in oklab, var(--colors-green-500) var(--un-bg-opacity), transparent);
+}
+.node0 {
+  background-color:color-mix(in oklab, var(--colors-blue-500) var(--un-bg-opacity), transparent);
+}
+}
