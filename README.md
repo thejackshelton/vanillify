@@ -163,35 +163,6 @@ npx vanillify "src/**/*.tsx" -f css-modules
 
 The CLI outputs `.vanilla.css` and `.vanilla.tsx` (or `.vanilla.jsx`) files, preserving the original file extension. With `--format css-modules`, it outputs `.module.css` and `.module.tsx` instead.
 
-## Custom Variants
-
-Tailwind v4's `@custom-variant` directive is supported. Create a CSS file with your variant definitions:
-
-```css
-/* tailwind.css */
-@custom-variant ui-open (&[data-open]);
-@custom-variant ui-checked (&[data-checked]);
-@custom-variant ui-disabled (&[data-disabled]);
-```
-
-Then pass it via the CLI:
-
-```bash
-npx vanillify "src/**/*.tsx" -c tailwind.css
-```
-
-Or programmatically:
-
-```ts
-import { readFileSync } from "node:fs";
-import { convert } from "vanillify";
-
-const css = readFileSync("tailwind.css", "utf-8");
-const result = await convert(source, "Component.tsx", { css });
-```
-
-Classes like `ui-open:bg-blue-500` will produce the correct `[data-open]` selector in the output CSS.
-
 ## How It Works
 
 Vanillify runs a four-step pipeline:

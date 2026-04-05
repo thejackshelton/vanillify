@@ -421,22 +421,22 @@ compiler.buildSourceMap(): DecodedSourceMap
 | A2 | `readFileSync` at module load time is acceptable for a build-time tool | Architecture Patterns | Low -- vanillify is explicitly a build-time tool, not runtime |
 | A3 | The `@layer utilities { ... }` regex extraction is reliable across all Tailwind build outputs | Pattern 4 | Medium -- edge cases with nested `@layer` or comments could break regex. Test thoroughly. |
 
-## Open Questions
+## Open Questions (RESOLVED)
 
 1. **How to handle `import.meta.url` resolution in dual ESM/CJS build?**
    - What we know: `createRequire` works in ESM, `require.resolve` works in CJS.
    - What's unclear: Whether tsdown's dual output handles this correctly.
-   - Recommendation: Use `createRequire(import.meta.url)` and test both builds. If CJS fails, fall back to `require.resolve('tailwindcss/package.json')`.
+   - RESOLVED: Use `createRequire(import.meta.url)` and test both builds. If CJS fails, fall back to `require.resolve('tailwindcss/package.json')`.
 
 2. **Should the adapter match `GenerateCSSResult` interface exactly or define its own?**
    - What we know: The existing interface has `matched: Set<string>` which UnoCSS provides natively. Tailwind requires inference.
    - What's unclear: Whether Phase 10 needs the `matched` set or just `unmatched`.
-   - Recommendation: Match the existing `GenerateCSSResult` interface shape to minimize Phase 10 changes. The `matched` set can be reconstructed from `candidates - unmatched`.
+   - RESOLVED: Match the existing `GenerateCSSResult` interface shape to minimize Phase 10 changes. The `matched` set can be reconstructed from `candidates - unmatched`.
 
 3. **Per-node compile() vs shared compiler with per-node build()?**
    - What we know: STATE.md says "fresh compile() per node for isolation." But testing shows build() produces isolated output per call already.
    - What's unclear: Whether there are edge cases where shared compiler state leaks between build() calls.
-   - Recommendation: Start with shared compiler (one compile() per CSS input), separate build() per node. The build() output is deterministic and stateless per call based on testing. This is 4x faster than per-node compile(). If isolation issues arise, fall back to per-node compile().
+   - RESOLVED: Start with shared compiler (one compile() per CSS input), separate build() per node. The build() output is deterministic and stateless per call based on testing. This is 4x faster than per-node compile(). If isolation issues arise, fall back to per-node compile().
 
 ## Environment Availability
 

@@ -1,285 +1,296 @@
 # Pitfalls Research
 
-**Domain:** Adding vite-plus migration, magic-regexp adoption, pnpm switch, and @theme support to existing UnoCSS-based library
+**Domain:** Replacing UnoCSS engine with Tailwind v4's native compile().build() API in vanillify
 **Researched:** 2026-04-05
-**Confidence:** MEDIUM (vite-plus is alpha; preset-wind4 @theme gap is confirmed)
+**Confidence:** MEDIUM (compile() API is exported but officially "internal/undocumented/not public" per maintainer statements)
 
 ---
 
 ## Critical Pitfalls
 
-### Pitfall 1: preset-wind4 Does Not Support Tailwind v4 @theme CSS Blocks
+### Pitfall 1: build() Is Additive and Stateful -- Cannot Isolate Per-Node CSS
 
 **What goes wrong:**
-Tailwind v4 uses `@theme` blocks in CSS files to define design tokens (colors, spacing, font sizes). UnoCSS's `preset-wind4` does NOT parse CSS `@theme` blocks. It only accepts theme configuration via the JavaScript/TypeScript `theme` key in `createGenerator` config. If vanillify tries to pass `@theme` CSS content to the generator, theme-defined tokens will silently produce no CSS output -- utilities referencing custom theme values (e.g., `bg-brand`, `text-heading`) will appear in the `unmatched` set with no error beyond the existing warning.
+Vanillify currently calls `generateCSS()` once per node (per `className` attribute) to get isolated CSS for that node only. The rewriter then rewrites selectors from `.utility-name` to `.node0`, `.node1`, etc. Tailwind's `build()` is explicitly additive -- the source code comments state "This currently assumes that we only add new candidates and never remove any." Each `build()` call returns the cumulative CSS for ALL candidates ever passed, not just the new ones. If you call `build(['flex'])` then `build(['flex', 'grid'])`, the second call returns CSS for both `flex` AND `grid`, not just `grid`.
 
 **Why it happens:**
-UnoCSS's architecture treats theme as a JavaScript config concern, not a CSS-file concern. Tailwind v4 moved theme to CSS (`@theme { --color-brand: #ff0000; }`) but UnoCSS has no CSS config file parser. The GitHub issue #4411 (closed April 2025) does not mention @theme support, and the preset-wind4 docs confirm only JS-based theme configuration.
+Tailwind v4's compile/build is designed for a build-tool pipeline where you scan all source files and produce one CSS bundle. It caches compiled results internally and only regenerates when new candidates appear. There is no `reset()` or `clear()` method on the compiler instance. This is fundamentally different from UnoCSS's `generator.generate(tokens)` which returns CSS for exactly the tokens you pass.
 
 **How to avoid:**
-1. Build a `@theme` block parser in vanillify that extracts CSS custom property definitions from the user's CSS file
-2. Map extracted `@theme` tokens to UnoCSS's JavaScript `theme` configuration object
-3. Pass the mapped theme into `createGenerator({ presets: [presetWind4()], theme: mappedTheme })`
-4. This follows the same pattern as vanillify's existing `@custom-variant` handling -- parse CSS syntax, translate to UnoCSS config
+Two strategies, in order of preference:
 
-The mapping layer needs to understand Tailwind v4's theme namespace conventions:
-- `--color-*` maps to `theme.colors`
-- `--spacing-*` maps to `theme.spacing`
-- `--font-size-*` maps to `theme.fontSize`
-- `--font-family-*` maps to `theme.fontFamily`
+1. **Single-pass generation with post-hoc splitting (recommended):** Collect ALL unique class tokens across ALL nodes first. Call `build()` once with the full set. Then parse the resulting CSS to extract per-class rules and map them to each node. This aligns with how Tailwind is designed to work and avoids fighting the additive behavior.
+
+2. **Fresh compiler per node (fallback, expensive):** Call `compile()` for each node to get a fresh stateless compiler, then call `build()` once. This defeats caching entirely and will be slow -- `compile()` parses the full CSS input and resolves all imports each time. Reserve for correctness validation only.
 
 **Warning signs:**
-- Tests pass for standard utilities but fail for any theme-dependent class
-- `unmatched` array grows when processing files from projects with custom themes
-- CSS output is empty for classes that reference custom theme tokens
+- CSS output grows monotonically across nodes even when later nodes have fewer classes
+- `.node5` CSS block contains rules for classes only used in `.node0`
+- Test: call `build(['flex'])` then `build(['grid'])` and check if the second output contains `.flex` rules (it will)
 
 **Phase to address:**
-Dedicated phase for @theme support -- do NOT attempt in the same phase as toolchain migration. This is feature work with its own complexity and risk. Must come after vite-plus/pnpm/magic-regexp migration is stable.
+Phase 1 (core generator rewrite). This is the most fundamental architectural difference and must be solved before anything else works.
 
 ---
 
-### Pitfall 2: Generator Cache Invalidation When Theme Config Changes
+### Pitfall 2: CSS Output Includes Layers, Preflight, and Theme Variables by Default
 
 **What goes wrong:**
-The existing `getGenerator()` in `generator.ts` caches generators keyed by variant config identity (sorted variant names). Adding theme support means the cache key must also include theme configuration. If the cache key does not account for theme, a generator created with Theme A will be reused for Theme B, producing incorrect CSS.
+When you call `compile('@import "tailwindcss"')`, the compiler ingests ALL of Tailwind: theme variables (`@layer theme`), preflight/reset styles (`@layer base`), and utilities (`@layer utilities`). The `build()` output is the FULL compiled CSS -- not just utility rules. This means the output will contain hundreds of lines of CSS reset (preflight), `:root` variable declarations, and `@layer` wrappers around everything.
+
+Vanillify's current `stripLayerWrappers()` and `extractThemeLayer()` in `generator.ts` are tuned to UnoCSS's layer format (`/* layer: default */`, `/* layer: theme */`). Tailwind v4 uses native CSS `@layer` blocks instead, which have different syntax but similar structure. The existing stripping logic may partially work but will miss Tailwind-specific patterns.
 
 **Why it happens:**
-The current cache key is `customVariants.map(v => '${v.name}:${v.match}').sort().join(',')` or `'__default__'`. Theme config is not part of this key. When `convert()` starts accepting theme options, the cached generator with the wrong theme will be silently returned.
+Tailwind v4 is an all-in-one CSS processor. `@import "tailwindcss"` expands to theme + preflight + utilities. Unlike UnoCSS where you get just utility CSS from `generate()`, Tailwind gives you the complete stylesheet.
 
 **How to avoid:**
-1. Extend the cache key to include a theme fingerprint: hash or serialize the theme object and append to the variant key
-2. Consider using `JSON.stringify(theme)` as part of the key (theme objects should be small and serializable)
-3. Add a test that explicitly verifies: create generator with theme A, then theme B, assert different CSS output
-4. Keep the `resetGenerator()` function for testing
+Control what gets compiled by using selective imports in the CSS input string:
+
+```typescript
+// Only utilities -- no preflight, no theme layer
+const compiler = await compile(`
+  @layer theme, base, components, utilities;
+  @import "tailwindcss/theme.css" layer(theme);
+  @import "tailwindcss/utilities.css" layer(utilities);
+`, { loadStylesheet });
+```
+
+Or for utilities only with no theme:
+```typescript
+const compiler = await compile(`
+  @import "tailwindcss/utilities.css" layer(utilities);
+`, { loadStylesheet });
+```
+
+Then strip the `@layer utilities { ... }` wrapper from the output. The existing `stripLayerWrappers()` should work since Tailwind v4 uses standard CSS `@layer` syntax (unlike UnoCSS's comment-based markers).
 
 **Warning signs:**
-- Tests pass when run individually but fail when run together (generator from previous test leaks)
-- Theme-dependent CSS works on first call but returns wrong values on subsequent calls with different themes
+- Output CSS is 500+ lines for a component with 3 utility classes
+- CSS contains `*, ::before, ::after` reset rules (preflight leaking)
+- CSS contains `--color-*`, `--spacing-*` variable declarations you did not request
+- Tests comparing output length between UnoCSS and Tailwind show 10x+ size difference
 
 **Phase to address:**
-Same phase as @theme support. The cache key change is a prerequisite for theme support, not an afterthought.
+Phase 1. The CSS input string to `compile()` determines what layers are included. Get this right in the initial adapter.
 
 ---
 
-### Pitfall 3: vite-plus Alpha Instability Breaking the Build Pipeline
+### Pitfall 3: loadStylesheet Callback Is Required and Non-Trivial
 
 **What goes wrong:**
-vite-plus was released as alpha on March 13, 2026. The `vp pack` command wraps tsdown, but as alpha software, the wrapper behavior may change between releases. Build output (file names, export map structure, .d.ts generation) could differ from the current tsdown direct output, breaking npm package consumers who depend on the existing `exports` field in package.json.
+`compile()` throws `"No 'loadStylesheet' function provided to 'compile'"` if you do not provide the `loadStylesheet` option. Even with a minimal CSS input like `@import "tailwindcss/utilities.css"`, the compiler needs to resolve that import to actual CSS content. This means vanillify must either:
+- Use `@tailwindcss/node` which provides filesystem-based resolution (adds a dependency)
+- Implement a custom `loadStylesheet` that resolves Tailwind's internal CSS files from `node_modules`
+
+If you get the resolution wrong, errors are opaque -- the compiler may silently produce empty CSS or throw with unhelpful messages.
 
 **Why it happens:**
-Alpha software by definition has unstable APIs. The `pack` block in `vite.config.ts` accepts "all tsdown configuration options" according to docs, but the translation layer between vite-plus config and tsdown invocation may have gaps. Entry point handling (`['./src/index.ts', './src/cli.ts']`), dual ESM+CJS output, and .d.ts paths may not map 1:1.
+Tailwind v4's compile() is deliberately decoupled from the filesystem. It is a pure CSS compiler that delegates I/O to callbacks. This is good design for portability (works in browsers, workers, etc.) but means every consumer must wire up resolution.
 
 **How to avoid:**
-1. Pin vite-plus to an exact version (no caret range) during migration
-2. Before removing `tsdown.config.ts`, verify that `vp pack` produces identical output structure:
-   - Same file names in `dist/` (index.mjs, index.cjs, index.d.mts, index.d.cts, cli.mjs)
-   - Same `exports` field compatibility
-   - Same .d.ts content (check for regressions in type generation)
-3. Keep `tsdown.config.ts` as a fallback until `vp pack` output is verified
-4. Write a build verification test: `npm pack --dry-run` output should list the same files before and after migration
-5. Test the package locally with `pnpm link` before publishing
+Use `@tailwindcss/node`'s `compile` wrapper which provides filesystem-backed `loadStylesheet` and `loadModule` out of the box. This is what the CLI and Vite plugin use internally.
+
+```typescript
+import { compile } from '@tailwindcss/node';
+// This version handles loadStylesheet automatically via enhanced-resolve
+const compiler = await compile(cssInput, { base: process.cwd() });
+```
+
+If you want to avoid the `@tailwindcss/node` dependency, implement a minimal resolver:
+
+```typescript
+import { compile } from 'tailwindcss';
+import { readFile } from 'fs/promises';
+import { resolve, dirname } from 'path';
+
+const tailwindBase = dirname(require.resolve('tailwindcss/package.json'));
+
+const compiler = await compile(cssInput, {
+  loadStylesheet: async (id, base) => {
+    const resolved = resolve(base || tailwindBase, id);
+    const content = await readFile(resolved, 'utf-8');
+    return { path: resolved, base: dirname(resolved), content };
+  }
+});
+```
 
 **Warning signs:**
-- `vp pack` exits 0 but dist/ has different file structure
-- TypeScript consumers report missing types after upgrade
-- CJS consumers get "ERR_REQUIRE_ESM" errors
-- CLI binary path (`./dist/cli.mjs`) changes or disappears
+- `compile()` throws about missing `loadStylesheet` immediately
+- CSS output is empty despite valid candidates
+- Resolution errors when Tailwind's internal CSS files import each other (chain resolution)
 
 **Phase to address:**
-First phase of milestone. Toolchain migration must be done and verified before any feature work.
+Phase 1. This is the first line of code you write -- if compile() does not initialize, nothing works.
 
 ---
 
-### Pitfall 4: vite-plus Unified Config Erasing Vitest Customization
+### Pitfall 4: Selector Format Differences Break the Rewriter
 
 **What goes wrong:**
-Moving from separate `vitest.config.ts` to the `test` block in `vite.config.ts` can silently drop test configuration. The current vitest config specifies `environment: 'node'` and custom `include` globs (`src/**/*.test.ts`, `test/**/*.test.ts`). If the migration forgets to carry these over, tests may not be found or may run in the wrong environment.
+The entire `rewriter.ts` (448 lines) is built around UnoCSS's selector escaping conventions. UnoCSS escapes CSS special characters with backslashes: `hover:bg-blue-700` becomes `.hover\:bg-blue-700:hover`. The rewriter's `buildSelectorPattern()`, `extractPseudo()`, and `matchesAnyPattern()` functions all assume this format.
+
+Tailwind v4's CSS output may use different escaping, different selector structures, or different at-rule nesting. Key differences:
+- Tailwind uses `@property` rules for custom properties (UnoCSS does not)
+- Tailwind may output `@media` queries with range syntax (`@media (width >= 640px)`) vs UnoCSS's `@media (min-width: 640px)`
+- Tailwind groups related utilities differently -- e.g., `space-x-4` generates a selector with `> :not(:last-child)` child combinators
+- Variant selectors like `hover:` may use different nesting or ordering
+
+If the rewriter's regex patterns do not match Tailwind's output format, nodes silently get empty CSS or incorrect selectors.
 
 **Why it happens:**
-vite-plus defaults may differ from vitest standalone defaults. The `include` pattern in vitest defaults to `['**/*.{test,spec}.{js,mjs,cjs,ts,mts,cts,jsx,tsx}']` which is broader than the current explicit `src/**/*.test.ts` and `test/**/*.test.ts`. The `environment` default is `'node'` in vitest but may not be preserved through the vite-plus wrapper.
+The rewriter was hand-tuned to UnoCSS output. It uses regex-based line-by-line parsing (`matchesAnyPattern` returns `true` by default as a safety fallback), string-based pseudo extraction, and brace-depth tracking. All of these assumptions may break with a different CSS engine.
 
 **How to avoid:**
-1. Copy the vitest config verbatim into the `test` block first, then simplify
-2. Run `vitest run --reporter=verbose` before AND after migration -- diff the test list
-3. Verify test count is identical (currently: extractor.test.ts, generator.test.ts, namer.test.ts, parser.test.ts, rewriter.test.ts in src/pipeline/ + parser.test.ts, resolver.test.ts in src/variants/ + integration tests)
-4. Keep `vitest.config.ts` until the unified config is verified, then delete in a separate commit
+1. **Snapshot test the CSS output format** before writing any rewriter changes. Generate CSS for 20-30 representative utilities (including variants, arbitrary values, responsive, dark mode) and capture the exact output format.
+2. **Consider a CSS parser** instead of regex for selector rewriting. A lightweight CSS parser (Lightning CSS is already bundled in Tailwind) would be more robust than line-by-line regex matching.
+3. If sticking with regex, build a comprehensive mapping of Tailwind output patterns and test each one. The single-pass approach (Pitfall 1) actually simplifies this -- you parse the full CSS output once and extract per-class rule blocks, rather than trying to match selectors.
 
 **Warning signs:**
-- Test count drops after migration (some test files not discovered)
-- Tests pass but coverage drops (files excluded from test run)
-- `vitest run` works but `vp test` does not (command name change)
+- `matchesAnyPattern()` always returns `true` (the current fallback behavior) masking missed patterns
+- Pseudo-class extraction produces `null` for Tailwind variants that work in UnoCSS
+- Media query blocks have different wrapper syntax than expected
+- Space/divide utilities produce multi-selector rules the rewriter does not handle
 
 **Phase to address:**
-First phase, same as build migration. Verify tests pass with unified config before proceeding.
+Phase 2 (rewriter adaptation). Must come after Phase 1 (generator) so you have actual Tailwind CSS output to test against.
 
 ---
 
-### Pitfall 5: pnpm Phantom Dependency Exposure
+### Pitfall 5: compile() API Is Not a Public API -- Breaking Changes Without Notice
 
 **What goes wrong:**
-Switching from npm to pnpm exposes phantom dependencies -- packages that vanillify imports but does not declare in `package.json`. pnpm's strict `node_modules` structure (symlinked, non-flat) means transitive dependencies are NOT hoisted to the top level. If any source file imports a module that is only a transitive dep (e.g., brought in by `@unocss/core` or `oxc-parser`), pnpm will fail at runtime with `ERR_MODULE_NOT_FOUND`.
+A Tailwind maintainer explicitly stated the programmatic API is "internal/undocumented/not public." The `compile` function is exported from the `tailwindcss` package, but it is not documented on tailwindcss.com, has no stability guarantees, and can change in any minor or patch release. The function signature, return type, and build() behavior could all change in v4.3, v4.4, etc.
 
 **Why it happens:**
-npm hoists everything to a flat `node_modules`. Developers unknowingly import transitive deps that happen to be available. The current `package.json` declares deps explicitly, but `@unocss/core` brings in sub-packages and `oxc-parser` brings in platform-specific binaries. Any implicit reliance on their internal structure will break.
+Tailwind Labs focuses on the CLI and build-tool integrations (Vite plugin, PostCSS plugin) as the public surface. The underlying `compile()` is an implementation detail that those tools use internally.
 
 **How to avoid:**
-1. Before migration: run `npx depcheck` to identify undeclared dependencies
-2. After `pnpm install`: run the full test suite immediately -- phantom deps will surface as import failures
-3. Do NOT use `shamefully-hoist=true` or `node-linker=hoisted` in `.npmrc` -- these defeat the purpose of pnpm
-4. If a phantom dep is found, add it explicitly to `package.json` dependencies
-5. Check that `oxc-parser` and `oxc-walker` native binary resolution works under pnpm's symlink structure (should work, but verify)
+1. **Pin the Tailwind version tightly** -- use exact version (`4.2.x`) not caret range (`^4.2.x`)
+2. **Wrap compile() in a thin adapter** (~40-50 lines as planned in PROJECT.md). The adapter is the ONLY file that imports from `tailwindcss` directly. If the API changes, you update one file.
+3. **Integration test against the actual compile() output** -- not mocked. Tests will fail immediately when a Tailwind update breaks the API.
+4. **Subscribe to Tailwind releases** and review changelogs. The `@tailwindcss/node` package is a slightly more stable wrapper since it is used by the CLI.
 
 **Warning signs:**
-- `pnpm install` succeeds but `pnpm test` fails with module not found
-- Build works locally but fails in CI (different resolution behavior)
-- Import of `@unocss/core` sub-paths (e.g., internal utilities) fails
+- Tailwind minor version bump causes vanillify tests to fail
+- `build()` return type changes (string to object, or gains additional properties)
+- New required options added to `compile()`
 
 **Phase to address:**
-First phase. pnpm migration should happen alongside or immediately after vite-plus migration, before any feature work.
+Phase 1 (design the adapter boundary). The thin-wrapper design from PROJECT.md is exactly right. Enforce it strictly -- no Tailwind imports outside the adapter file.
 
 ---
 
-### Pitfall 6: magic-regexp Cannot Replace Dynamic Runtime Regex Patterns
+## Moderate Pitfalls
+
+### Pitfall 6: No Built-in Unmatched Class Detection
 
 **What goes wrong:**
-The codebase has regex patterns that magic-regexp fundamentally cannot handle:
-1. `rewriter.ts` line 216: `new RegExp(pattern + '(?:[:{\\s]|$)')` -- constructed at runtime from CSS class names
-2. `rewriter.ts` line 97: `escapeRegex()` -- a meta-pattern for escaping regex special chars
-3. `rewriter.ts` line 107: `buildSelectorPattern()` -- runtime CSS escaping fed to `new RegExp()`
-
-magic-regexp is a "compiled-away" library designed for static, compile-time patterns. The `matchesAnyPattern` function builds regex from CSS class names at runtime -- this is fundamentally incompatible with magic-regexp's design. Attempting to force magic-regexp here will result in either type errors, runtime overhead, or incorrect behavior.
-
-**Why it happens:**
-The project requirement says "replace all regex with magic-regexp." But magic-regexp was designed for readable, static patterns -- not for programmatic regex construction. The vanillify codebase uses BOTH static patterns (good candidates) AND dynamic patterns (cannot be converted).
+UnoCSS's `generate()` returns a `matched` Set containing every token that produced CSS. Vanillify uses this to compute `unmatched = tokens.filter(t => !result.matched.has(t))` and emit warnings. Tailwind's `build()` returns only a CSS string -- no matched/unmatched metadata. If you pass `['flex', 'bg-nonexistent']`, you get CSS for `flex` and silence for `bg-nonexistent`. No error, no warning, no way to know something was skipped.
 
 **How to avoid:**
-1. Audit every regex and categorize: static (convertible) vs dynamic (must stay raw)
-2. Static candidates for magic-regexp:
-   - `SHORTHAND_RE` in `variants/parser.ts` -- good candidate, well-defined structure
-   - `/@layer\s+[\w-]+\s*\{/g` in `generator.ts` -- good candidate
-   - Variant name validator `/^[\w-]+$/` in `variants/parser.ts` -- marginal, arguably clearer as raw regex
-3. Dynamic patterns that MUST stay as raw regex:
-   - All patterns in `matchesAnyPattern` in `rewriter.ts` -- runtime-constructed
-   - `buildSelectorPattern` output fed to `new RegExp()` -- runtime
-   - `escapeRegex` helper -- meta-pattern, clearer as raw regex
-4. Accept a mixed approach: magic-regexp for static patterns, raw regex for dynamic ones
-5. Do NOT force 100% magic-regexp adoption -- it will create worse code for dynamic cases
+After calling `build()`, parse the returned CSS to determine which candidates actually generated rules. Build a set of "classes that appear as selectors in the output" and diff against the input candidates. This is approximate but catches most cases. For variants (e.g., `hover:bg-blue-700`), the selector will be escaped differently from the input token, so the matching logic needs to account for Tailwind's escaping.
 
-**Warning signs:**
-- Trying to wrap `createRegExp()` around runtime-variable patterns and getting type errors
-- Build-time transform fails because pattern is not statically analyzable
-- Performance regression from magic-regexp runtime on hot paths in rewriter
+Alternatively, call `build()` with one candidate at a time and check if the output CSS grew -- but this fights the additive behavior and is slow.
 
 **Phase to address:**
-Second phase, after toolchain migration. Low risk but needs careful audit to avoid over-applying.
+Phase 2 or 3. Not blocking for core functionality but needed before public release to maintain warning parity.
 
 ---
 
-### Pitfall 7: magic-regexp Transform Not Available in tsdown/vite-plus Library Build
+### Pitfall 7: compile() Instantiation Cost Is High
 
 **What goes wrong:**
-magic-regexp ships a build-time transform (unplugin) that compiles `createRegExp()` calls to pure `RegExp` literals at build time -- zero runtime overhead. But this transform is designed for Vite/webpack/Nuxt app builds. For a library built with tsdown (or `vp pack`), the transform may not be available or may not integrate cleanly. Without the transform, magic-regexp adds ~1 kB runtime overhead and executes `createRegExp` at call time instead of compile time.
+`compile()` parses the full input CSS, resolves all imports (via `loadStylesheet` callbacks which hit the filesystem), processes `@theme` blocks, builds the utility registry, and resolves plugins. This is expensive -- measured in tens of milliseconds per call. If vanillify creates a fresh compiler per node (to work around additive build behavior), a component with 20 nodes means 20 compile() calls, each doing full CSS resolution.
 
 **Why it happens:**
-magic-regexp's unplugin targets application bundlers, not library bundlers. tsdown uses Rolldown which has its own plugin system. The magic-regexp unplugin compatibility with Rolldown/tsdown is undocumented.
+Tailwind's architecture assumes compile-once, build-many. The build-tool plugins (Vite, PostCSS) instantiate one compiler per project build. Vanillify's per-node isolation pattern is outside the intended usage.
 
 **How to avoid:**
-1. Test whether magic-regexp's unplugin works with tsdown/Rolldown
-2. If it does not: accept the ~1 kB runtime cost (minimal for a Node.js library)
-3. If runtime overhead matters: define regex patterns as module-level constants (executed once at import, not per call)
-4. Alternative: use magic-regexp only in test files for readable assertions, keep raw regex in source
-
-**Warning signs:**
-- `vp pack` build output still contains `createRegExp()` calls (transform didn't run)
-- Bundle size increases by 1+ kB compared to raw regex version
-- Runtime pattern construction is measurably slower on hot paths
+1. **One compiler instance per convert() call** -- instantiate once, build once with all candidates
+2. **Cache the compiler across convert() calls** that share the same CSS input (same theme, same config). The current `_cache` Map pattern in `generator.ts` translates directly -- key by the CSS input string hash
+3. **Never create a compiler per node** unless as a last-resort correctness check
 
 **Phase to address:**
-Second phase (magic-regexp adoption). Investigate transform compatibility before committing to magic-regexp in source.
+Phase 1. The caching strategy must be designed upfront to avoid painting yourself into a performance corner.
 
 ---
 
-### Pitfall 8: pnpm Lockfile and CI Cache Invalidation
+### Pitfall 8: @theme and @custom-variant Just Work -- But the Input CSS Must Include Them
 
 **What goes wrong:**
-Switching from npm to pnpm means replacing `package-lock.json` with `pnpm-lock.yaml`. CI pipelines that cache `node_modules` based on `package-lock.json` hash will miss the cache entirely, causing slow CI runs until updated. If CI scripts still reference `npm ci` or `npm install`, they will create a parallel `package-lock.json` and install with npm's flat resolution, defeating pnpm's strict structure.
+One of the big wins of this migration is deleting the custom theme and variant translation layers (`src/theme/` and `src/variants/`). Tailwind handles `@theme` and `@custom-variant` natively. BUT: this only works if the user's CSS definitions are included in the input to `compile()`. If vanillify constructs the CSS input string without the user's `@theme` and `@custom-variant` blocks, Tailwind will not know about them.
+
+The current API accepts `customVariants` as a JavaScript object (`VariantObject[]`) and `themeConfig` as a JS object. The new API needs to accept raw CSS strings containing `@theme` and `@custom-variant` directives and prepend/append them to the compile() input.
 
 **Why it happens:**
-CI configuration and lockfile are easy to forget during a package manager migration. The project currently has `package-lock.json` in the root. GitHub Actions and other CI systems often have npm-specific caching built in.
+Tailwind v4 is CSS-first. Configuration is CSS, not JavaScript. The public API shape change from "JS objects" to "CSS strings" is the migration's whole point, but it is easy to forget edge cases -- e.g., the user passes a CSS file path that needs to be read and concatenated.
 
 **How to avoid:**
-1. Delete `package-lock.json` after generating `pnpm-lock.yaml`
-2. Add `packageManager: "pnpm@9.x.x"` field to `package.json` for corepack
-3. Update all CI workflows to use `pnpm install --frozen-lockfile`
-4. Update CI cache key to hash `pnpm-lock.yaml` instead of `package-lock.json`
-5. Use `pnpm/action-setup` or corepack in GitHub Actions
-6. Add `package-lock.json` to `.gitignore` to prevent accidental recreation
-
-**Warning signs:**
-- CI takes 3-5x longer after migration (cache miss)
-- CI creates both `package-lock.json` and `pnpm-lock.yaml`
-- `pnpm install --frozen-lockfile` fails in CI (lockfile not committed)
+1. Accept `themeCss: string` parameter (CSS content, not a file path) in the public API
+2. Concatenate user CSS before the Tailwind import: `${userCss}\n@import "tailwindcss/utilities.css" layer(utilities);`
+3. Test with real QDS `@custom-variant` definitions to verify they work in Tailwind's pipeline
+4. Ensure `loadStylesheet` can resolve any `@import` statements in the user's CSS
 
 **Phase to address:**
-First phase, same commit as pnpm migration. CI must be updated atomically.
+Phase 2 (public API adaptation). The generator adapter (Phase 1) should accept raw CSS; the public API change comes after.
 
 ---
 
-### Pitfall 9: @theme Token Namespace Mapping is Lossy and Incomplete
+### Pitfall 9: Preflight Duplication in Multi-Call Scenarios
 
 **What goes wrong:**
-Tailwind v4's `@theme` block uses CSS custom property namespaces (`--color-*`, `--spacing-*`, etc.) that must be mapped to UnoCSS's JavaScript `theme` object structure. This mapping is not 1:1. Tailwind v4 allows arbitrary custom properties in `@theme` that have no UnoCSS equivalent. Additionally, preset-wind4's theme keys differ from preset-wind3 (e.g., `fontFamily` adjustments). If the mapping is incomplete, theme-dependent utilities silently produce no CSS.
+If vanillify processes multiple components in a project and each conversion includes preflight/base styles, the combined output contains duplicate resets. This was not a problem with UnoCSS (which returned only utility CSS), but Tailwind's full output includes preflight by default.
 
-**Why it happens:**
-Tailwind v4's @theme is a CSS-first configuration system. UnoCSS's theme is a JavaScript-first configuration system. The namespaces evolved independently. Tailwind v4 also supports inline `@theme` values that modify the default theme (e.g., `@theme { --color-primary: oklch(0.7 0.15 200); }`) -- these need to be merged with preset-wind4's default theme, not replace it.
+Even if you exclude preflight via selective imports, the theme layer (`:root` variable definitions) will duplicate across conversions if each compiler instance includes it.
 
 **How to avoid:**
-1. Start with a strict subset: `--color-*`, `--spacing-*`, `--font-size-*`, `--font-family-*`, `--breakpoint-*`
-2. Log unrecognized `@theme` namespaces as warnings (not errors)
-3. Merge parsed theme INTO the preset-wind4 default theme (spread/deep-merge), do not replace it
-4. Write tests using Tailwind v4's own default theme values to verify correct mapping
-5. Accept that some edge-case @theme properties will not map -- document the supported set
-
-**Warning signs:**
-- Custom theme colors work but custom spacing does not (incomplete namespace mapping)
-- Default Tailwind utilities break after theme is applied (theme replaced defaults instead of extending)
-- `oklch()` color values from @theme are not recognized by UnoCSS
+- Default to utilities-only output (no preflight, no theme layer)
+- Provide a separate `extractTheme()` function that returns the theme CSS once for the project
+- Document that preflight should be included separately via standard Tailwind setup
 
 **Phase to address:**
-@theme support phase. The namespace mapping is the core of this feature and should be built incrementally with tests for each namespace.
+Phase 2 (output format). Design the output to be composable -- theme once, utilities per component.
 
 ---
 
-### Pitfall 10: Theme + Custom Variant Interaction is Untested Territory
+## Minor Pitfalls
+
+### Pitfall 10: Version Conflict -- tailwindcss v3 vs v4 in the Same Project
 
 **What goes wrong:**
-When a user defines both `@theme { --color-brand: #ff0000; }` and `@custom-variant ui-checked ([ui-checked] &)`, then uses `ui-checked:bg-brand` in their component, vanillify needs to:
-1. Parse the @theme block and map `--color-brand` to UnoCSS theme
-2. Parse the @custom-variant and translate to UnoCSS variant
-3. Pass BOTH to `createGenerator` simultaneously
-4. The generator must resolve `bg-brand` (theme-dependent) under `ui-checked` (custom variant)
-
-If either layer is configured incorrectly, or if the generator cache key doesn't account for the combined config, the output will be wrong or empty.
-
-**Why it happens:**
-Theme and variants are independent features in vanillify's architecture, but they must compose correctly in the generator. The current generator cache keys by variant config only. Adding theme creates a combinatorial config space that the cache must handle.
+If a user's project has `tailwindcss@3.x` installed and vanillify depends on `tailwindcss@4.x`, npm/pnpm may resolve to the wrong version. The `compile` export does not exist in v3, causing `"does not provide an export named 'compile'"` errors. This was a real issue reported in Nuxt UI (github.com/nuxt/ui/issues/2455).
 
 **How to avoid:**
-1. Build theme support and custom variant support as composable options that feed into a single `createGenerator` call
-2. Cache key must be `hash(variants) + hash(theme)` -- not just one
-3. Write explicit integration tests for theme + variant composition:
-   - `hover:bg-brand` (built-in variant + theme color)
-   - `ui-checked:bg-brand` (custom variant + theme color)
-   - `md:ui-checked:bg-brand` (responsive + custom variant + theme color)
-4. Test the full `convert()` pipeline, not just individual layers
-
-**Warning signs:**
-- `bg-brand` works but `hover:bg-brand` produces empty CSS
-- Theme and variants work independently but not together
-- Stacking a custom variant with a theme-dependent class produces no output
+Declare `tailwindcss` as a `peerDependency` with `">=4.0.0"` range. Document the v4 requirement clearly. Add a startup check that verifies the installed Tailwind version.
 
 **Phase to address:**
-@theme support phase, after individual theme and variant features are working. Composition testing is the integration gate.
+Phase 3 (packaging/distribution).
+
+---
+
+### Pitfall 11: Media Query Syntax Differences
+
+**What goes wrong:**
+Tailwind v4 uses Lightning CSS which outputs modern range media query syntax: `@media (width >= 640px)` instead of the legacy `@media (min-width: 640px)` that UnoCSS produces. If any downstream consumer of vanillify's CSS output uses tools that do not support range syntax (older PostCSS plugins, some minifiers), the CSS will break.
+
+**How to avoid:**
+Tailwind's compile() accepts a `polyfills` option that can force legacy syntax. Alternatively, document that vanillify outputs modern CSS and let consumers handle compatibility.
+
+**Phase to address:**
+Phase 3 (output format options, if needed).
+
+---
+
+### Pitfall 12: build() Returns Empty String When No Utilities Are Matched
+
+**What goes wrong:**
+If the CSS input to `compile()` does not include `@tailwind utilities` or an equivalent utilities import, `build()` returns the compiled CSS without any utility injection. The Features bitfield can be checked -- if `Features.Utilities` is not set, build() will not generate utility CSS regardless of what candidates you pass.
+
+**How to avoid:**
+Always include a utilities layer in the compile() input. After compile(), check the `features` bitfield: `if (!(compiler.features & Features.Utilities)) throw new Error(...)`.
+
+**Phase to address:**
+Phase 1 (compiler initialization validation).
 
 ---
 
@@ -287,94 +298,83 @@ Theme and variants are independent features in vanillify's architecture, but the
 
 | Shortcut | Immediate Benefit | Long-term Cost | When Acceptable |
 |----------|-------------------|----------------|-----------------|
-| Using `shamefully-hoist=true` in pnpm | Quick fix for phantom deps | Defeats pnpm's strict resolution, hides real dependency issues | Never -- fix the actual missing dependencies |
-| Keeping both `tsdown.config.ts` and `vite.config.ts` `pack` block | Safety net during migration | Two sources of truth for build config, will drift | During migration only -- delete tsdown.config.ts once `vp pack` verified |
-| Hardcoding theme token mappings instead of parsing @theme | Faster to implement | Breaks when Tailwind v4 adds new theme namespaces | MVP of theme support only -- must be generalized before v1.2 |
-| Skipping magic-regexp for all dynamic regex | Avoids forced awkward code | Inconsistent codebase style (some magic-regexp, some raw) | Permanent -- dynamic regex should stay as raw regex, this is the correct approach |
-| Faking @theme support with a lookup table | Covers common cases | Diverges from real Tailwind CSS output (same problem as competitors vanillify exists to solve) | Never -- this is the exact anti-pattern vanillify was built to avoid |
-| Accepting magic-regexp runtime without build transform | Simpler setup, no plugin config | 1 kB runtime overhead, patterns constructed at import time | Acceptable for a Node.js library -- measure, don't over-optimize |
+| Use `@tailwindcss/node` instead of raw `compile()` | Filesystem resolution handled for you | Extra dependency, couples to Node.js (no browser/worker support) | Acceptable for v2.0 since vanillify is Node-only. Revisit if portability becomes a requirement |
+| Keep regex-based rewriter instead of CSS parser | Fewer dependencies, less rewrite work | Fragile against CSS output format changes, hard to maintain | Only in initial migration. Plan to replace with CSS parser in v2.1+ |
+| Pin exact Tailwind version | Stability | Miss bug fixes, security patches | Acceptable for initial release. Use renovate/dependabot with test gates |
+| Single build() call with post-hoc CSS splitting | Aligns with Tailwind's architecture | Requires CSS parsing to split per-node | Always -- this is the correct approach, not a shortcut |
 
 ## Integration Gotchas
 
 | Integration | Common Mistake | Correct Approach |
 |-------------|----------------|------------------|
-| vite-plus + tsdown | Configuring `pack` block but keeping `tsdown.config.ts` -- tsdown may read its own config and ignore vite-plus | Delete `tsdown.config.ts` after verifying `vp pack` output matches. Do not have both config files. |
-| vite-plus + vitest | Assuming `vp test` inherits vitest defaults when vitest config was customized | Explicitly copy `environment: 'node'` and `include` patterns into the `test` block of vite.config.ts |
-| pnpm + oxc-parser | Assuming native binary resolution works the same as npm | Verify `oxc-parser` and `oxc-walker` native binaries install correctly under pnpm's content-addressable store. Run `parseSync` smoke test after migration. |
-| pnpm + CI (GitHub Actions) | Using `npm ci` or `npm install` in CI scripts after switching to pnpm | Update CI to `pnpm install --frozen-lockfile`. Add `packageManager` field in package.json for corepack. |
-| magic-regexp + tsdown/rolldown | Expecting the compile-away transform to work without explicit plugin setup | The magic-regexp transform is a build plugin (Vite/webpack/Nuxt). For tsdown: either (a) use the runtime (1 kB), or (b) investigate unplugin compatibility with Rolldown. Verify before committing. |
-| @theme parser + generator cache | Parsing @theme and passing to `createGenerator` without updating cache key | Hash the theme config and include in cache key alongside variant hash. Test with multiple themes in sequence. |
-| preset-wind4 theme + custom variants | Assuming theme tokens and custom variants compose automatically | They interact when a variant-prefixed class references a theme token (`hover:bg-brand`). Test this combination explicitly -- it requires both theme and variant config to be present in the same generator. |
+| `compile()` initialization | Passing `@import "tailwindcss"` and getting preflight + theme + utilities | Use selective imports: only `tailwindcss/theme.css` + `tailwindcss/utilities.css` |
+| `loadStylesheet` callback | Hardcoding paths or using `require.resolve` which fails in ESM | Use `@tailwindcss/node` or `import.meta.resolve` with proper ESM resolution |
+| `build()` candidates format | Passing a Set (like UnoCSS's `generate()` accepts) | `build()` takes `string[]`, not `Set<string>`. Convert with `[...tokens]` |
+| Theme CSS inclusion | Passing theme config as a JS object (old UnoCSS pattern) | Prepend `@theme { ... }` CSS block to the compile() input string |
+| Custom variant inclusion | Passing variant objects (old UnoCSS `VariantObject[]`) | Include `@custom-variant` CSS directives in the compile() input |
+| Error handling | Assuming build() throws on invalid candidates | build() silently ignores unrecognized candidates -- no errors, no warnings |
 
 ## Performance Traps
 
 | Trap | Symptoms | Prevention | When It Breaks |
 |------|----------|------------|----------------|
-| Creating new `createGenerator` per theme config without caching | `convert()` latency jumps from ~10ms to ~100ms+ | Cache generators by theme+variant composite key | When processing files from multiple theme contexts in sequence |
-| magic-regexp runtime on hot path (rewriter `matchesAnyPattern`) | Measurable slowdown in conversion of files with many class names | Keep `matchesAnyPattern` as raw regex -- magic-regexp is for static patterns only | Files with 50+ unique class names |
-| Parsing @theme CSS on every `convert()` call | Redundant work if theme CSS hasn't changed | Parse @theme once, pass resulting config to all `convert()` calls. Let the caller cache the theme parse result. | Batch processing of many files with same theme |
-| pnpm install in CI without store cache | CI time doubles compared to npm with node_modules cache | Configure pnpm store cache in GitHub Actions (`pnpm/action-setup` with cache) | Every CI run without cache |
+| Creating compile() instance per node | 50ms+ per node, 1s+ for 20-node components | Single compiler instance per convert() call | Immediately noticeable with >3 nodes |
+| Creating compile() instance per convert() call without caching | 50ms overhead per conversion, noticeable in batch processing | Cache compiler instances by CSS input hash (same pattern as current `_cache` Map) | Noticeable at 10+ sequential conversions |
+| Parsing CSS output with regex to split per-node rules | Works but O(n*m) where n=nodes, m=CSS lines | Use a streaming CSS tokenizer or simple brace-depth parser | >100 utility classes per component |
+| Not reusing loadStylesheet results | Filesystem reads on every compile() | Cache file contents in loadStylesheet callback | Batch processing multiple files |
 
 ## "Looks Done But Isn't" Checklist
 
-- [ ] **vite-plus migration:** `vp pack` runs without error -- verify dist/ file structure matches previous tsdown output (index.mjs, index.cjs, index.d.mts, index.d.cts, cli.mjs)
-- [ ] **vite-plus migration:** `vp test` discovers all test files -- compare test count before/after, not just pass/fail
-- [ ] **vite-plus migration:** package.json `scripts` updated from `tsdown`/`vitest run` to `vp pack`/`vp test`
-- [ ] **pnpm migration:** `pnpm install` succeeds -- verify with `pnpm test` AND `pnpm build`, not just install
-- [ ] **pnpm migration:** CI updated -- workflows use pnpm, `packageManager` field set, `package-lock.json` removed
-- [ ] **pnpm migration:** `oxc-parser` and `oxc-walker` native binaries work under pnpm symlink structure
-- [ ] **magic-regexp:** Static patterns converted -- verify dynamic patterns in `rewriter.ts` are intentionally left as raw regex (not forgotten)
-- [ ] **magic-regexp:** Build-time transform configured OR runtime overhead measured and accepted (1 kB for Node.js library is fine)
-- [ ] **@theme support:** Standard theme tokens (`--color-*`, `--spacing-*`) produce correct CSS via mapped `createGenerator` config
-- [ ] **@theme support:** Theme + variant interaction tested -- `hover:bg-brand` where `brand` comes from @theme
-- [ ] **@theme support:** Generator cache correctly invalidates -- test: theme A then theme B produces different CSS
-- [ ] **@theme support:** `convert()` API contract unchanged -- all existing tests pass without modification
-- [ ] **@theme support:** Theme merge extends preset-wind4 defaults, does not replace them
-- [ ] **Overall:** `pnpm pack --dry-run` output lists same publishable files as before migration
+- [ ] **Generator adapter:** Returns only utility CSS -- verify no preflight rules in output (`*, ::before, ::after` is a telltale sign)
+- [ ] **Per-node isolation:** Each `.nodeN` block contains ONLY rules for that node's classes -- verify with a 3-node component where each node has unique classes
+- [ ] **Variant selectors:** `hover:`, `focus:`, `sm:`, `dark:` all produce correct pseudo/media selectors -- verify escaping matches what the rewriter expects
+- [ ] **Arbitrary values:** `bg-[#ff0000]`, `w-[200px]`, `grid-cols-[1fr_2fr]` all generate correct CSS -- these use different escaping in Tailwind vs UnoCSS
+- [ ] **Unmatched detection:** Invalid classes like `bg-nonexistent` produce warnings -- verify the post-hoc detection works
+- [ ] **Theme variables:** `:root` custom properties appear in `themeCss` output when user provides `@theme` block -- verify they are separated from utility CSS
+- [ ] **Empty input:** `build([])` returns cached CSS or empty string without errors
+- [ ] **Duplicate classes:** Same class in multiple nodes does not cause CSS duplication in the per-node output
+- [ ] **Public API shape:** `ConvertOptions` and `ConvertResult` types are unchanged -- verify with existing tests before and after migration
 
 ## Recovery Strategies
 
 | Pitfall | Recovery Cost | Recovery Steps |
 |---------|---------------|----------------|
-| vite-plus pack produces wrong output | LOW | Revert to `tsdown.config.ts` (keep it until verified). Run `tsdown` directly as fallback. |
-| pnpm phantom dep breaks build/test | LOW | Run `pnpm add <missing-package>` for each missing dep. One-time fix, quick. |
-| Generator cache serves stale theme | MEDIUM | Call `resetGenerator()` to clear cache. Add theme to cache key. Re-run affected tests. |
-| magic-regexp breaks dynamic pattern | LOW | Revert that specific pattern to raw regex. Mixed approach is the correct design. |
-| preset-wind4 cannot handle mapped theme tokens | HIGH | May need to contribute upstream to UnoCSS or build a more sophisticated theme translation layer. File UnoCSS issue for @theme support. |
-| @theme parser misses edge cases | MEDIUM | Start with strict parser for standard Tailwind v4 namespaces only. Expand incrementally. Log unrecognized namespaces as warnings. |
-| vite-plus alpha API changes break config | MEDIUM | Pin exact version. If breaking change occurs, revert to separate tsdown.config.ts + vitest.config.ts until next stable release. |
+| Additive build() leaking CSS between nodes | MEDIUM | Refactor to single-pass + post-hoc splitting. Requires rewriter changes but generator stays the same |
+| Preflight in output | LOW | Change the CSS input string to compile(). One-line fix |
+| loadStylesheet errors | LOW | Switch to @tailwindcss/node or fix resolution paths. Isolated to adapter file |
+| Rewriter selector mismatches | HIGH | Snapshot actual Tailwind output, update all regex patterns, extensive test coverage. Consider CSS parser replacement |
+| API breaking change in Tailwind minor | MEDIUM | Update adapter file. If signature changed, may need to update caching logic too. Integration tests catch this immediately |
+| Unmatched detection missing | LOW | Add CSS output parsing. Not blocking for core functionality |
 
 ## Pitfall-to-Phase Mapping
 
 | Pitfall | Prevention Phase | Verification |
 |---------|------------------|--------------|
-| vite-plus alpha instability | Phase 1: Toolchain Migration | `vp pack` output matches tsdown output; `vp test` finds all tests; all existing tests pass |
-| Vitest config loss in unified config | Phase 1: Toolchain Migration | Test count identical before/after; environment is 'node'; include globs preserved |
-| pnpm phantom dependencies | Phase 1: Toolchain Migration | `pnpm test` and `pnpm build` pass; no `shamefully-hoist` in .npmrc |
-| pnpm CI cache invalidation | Phase 1: Toolchain Migration | CI workflow uses pnpm with frozen lockfile and store cache; no package-lock.json |
-| magic-regexp over-application to dynamic regex | Phase 2: Code Quality | Dynamic patterns in rewriter.ts remain as raw regex; static patterns use magic-regexp |
-| magic-regexp transform unavailable in tsdown | Phase 2: Code Quality | Either unplugin configured OR runtime overhead measured as acceptable |
-| preset-wind4 @theme CSS block gap | Phase 3: Theme Support | Theme parser extracts tokens; mapped tokens produce correct CSS via createGenerator |
-| Generator cache stale theme | Phase 3: Theme Support | Test: sequential convert() calls with different themes produce different CSS |
-| @theme namespace mapping completeness | Phase 3: Theme Support | Tests cover colors, spacing, fontSize, fontFamily at minimum |
-| Theme + custom variant composition | Phase 3: Theme Support | `ui-checked:bg-brand` where brand is theme-defined produces correct CSS |
-| Theme merge replaces instead of extends defaults | Phase 3: Theme Support | Default Tailwind utilities still work after custom theme applied |
+| Additive build() (P1) | Phase 1: Generator rewrite | Test: per-node CSS contains only that node's rules |
+| CSS output format (P2) | Phase 1: Generator rewrite | Test: output does not contain preflight, output size is proportional to input classes |
+| loadStylesheet (P3) | Phase 1: Generator rewrite | Test: compile() initializes without errors, resolves Tailwind internal CSS |
+| Selector format (P4) | Phase 2: Rewriter adaptation | Test: snapshot tests for 30+ representative utilities match expected selectors |
+| API stability (P5) | Phase 1: Adapter design | Verify: all Tailwind imports are in exactly one file |
+| Unmatched detection (P6) | Phase 2/3: Warning parity | Test: invalid class names produce warnings |
+| Instantiation cost (P7) | Phase 1: Caching design | Benchmark: batch of 10 conversions completes in <500ms |
+| Theme/variant CSS input (P8) | Phase 2: Public API | Test: QDS @custom-variant definitions produce correct CSS |
+| Preflight duplication (P9) | Phase 2: Output design | Test: multi-component conversion does not contain duplicate resets |
+| Version conflict (P10) | Phase 3: Packaging | Verify: peerDependency declared, startup version check |
+| Media query syntax (P11) | Phase 3: Output options | Document modern CSS output requirement |
+| Empty utilities (P12) | Phase 1: Validation | Test: Features bitfield check on compiler initialization |
 
 ## Sources
 
-- [UnoCSS preset-wind4 docs](https://unocss.dev/presets/wind4) -- confirmed: no @theme CSS block support, JS theme config only (HIGH confidence)
-- [UnoCSS Tailwind v4 Support Plan #4411](https://github.com/unocss/unocss/issues/4411) -- closed April 2025, @theme not mentioned (HIGH confidence)
-- [UnoCSS theme configuration](https://unocss.dev/config/theme) -- JS-based theme API documentation (HIGH confidence)
-- [Vite+ configuration docs](https://viteplus.dev/config/) -- unified defineConfig with pack, test, lint, fmt blocks (MEDIUM confidence -- alpha)
-- [Vite+ pack docs](https://viteplus.dev/guide/pack) -- `vp pack` wraps tsdown, accepts all tsdown options (MEDIUM confidence -- alpha)
-- [Vite+ GitHub](https://github.com/voidzero-dev/vite-plus) -- alpha release March 2026 (HIGH confidence)
-- [Vite+ announcement](https://voidzero.dev/posts/announcing-vite-plus) -- ecosystem context, tsdown/vitest integration (HIGH confidence)
-- [magic-regexp docs](https://regexp.dev/guide/usage) -- compiled-away, 1.06 kB runtime, no backreference support documented (MEDIUM confidence)
-- [magic-regexp npm](https://www.npmjs.com/package/magic-regexp) -- v0.11.0, zero-dependency (HIGH confidence)
-- [magic-regexp GitHub](https://github.com/unjs/magic-regexp) -- UnJS ecosystem, transform is unplugin-based (HIGH confidence)
-- [pnpm phantom dependencies](https://medium.com/@ddylanlinn/why-your-code-breaks-after-switching-to-pnpm-the-phantom-dependencies-36e779c3a4a0) -- strict resolution prevents phantom deps (HIGH confidence)
-- [pnpm migration guide](https://divriots.com/blog/switching-to-pnpm/) -- lockfile migration, CI considerations (MEDIUM confidence)
+- [Tailwind CSS v4 compile() source code](https://github.com/tailwindlabs/tailwindcss/blob/main/packages/tailwindcss/src/index.ts) -- compile() signature, build() additive behavior confirmed in source comments: "This currently assumes that we only add new candidates and never remove any" (HIGH confidence)
+- [GitHub Discussion #16581: How to use Tailwind 4 programmatically](https://github.com/tailwindlabs/tailwindcss/discussions/16581) -- maintainer confirmed API is "internal/undocumented/not public" (HIGH confidence)
+- [GitHub Discussion #15881: How to compile Tailwind v4 programmatically](https://github.com/tailwindlabs/tailwindcss/discussions/15881) -- community workarounds, loadStylesheet patterns (MEDIUM confidence)
+- [GitHub Discussion #18356: Runtime compilation not working after v4.1](https://github.com/tailwindlabs/tailwindcss/discussions/18356) -- API instability evidence, @tailwindcss/node recommendation (MEDIUM confidence)
+- [GitHub Issue #15723: Cannot disable preflight styles](https://github.com/tailwindlabs/tailwindcss/issues/15723) -- selective imports to exclude preflight confirmed working (HIGH confidence)
+- [GitHub Issue #19853: Duplicate unlayered preflight in production](https://github.com/tailwindlabs/tailwindcss/issues/19853) -- preflight duplication is a known issue (MEDIUM confidence)
+- [Nuxt UI Issue #2455: compile export not found](https://github.com/nuxt/ui/issues/2455) -- v3/v4 version conflict evidence (HIGH confidence)
+- [@tailwindcss/node source code](https://github.com/tailwindlabs/tailwindcss/blob/main/packages/%40tailwindcss-node/src/compile.ts) -- loadStylesheet/loadModule implementation using enhanced-resolve (HIGH confidence)
+- [Tailwind CSS v4 Preflight docs](https://tailwindcss.com/docs/preflight) -- layer structure: theme, base, components, utilities (HIGH confidence)
 
 ---
-*Pitfalls research for: vanillify v1.1 -- vite-plus, magic-regexp, pnpm, @theme support*
+*Pitfalls research for: Tailwind v4 compile() migration in vanillify*
 *Researched: 2026-04-05*

@@ -1,509 +1,274 @@
-# Stack Research: v1.1 Toolchain & Theme Support
+# Technology Stack: Tailwind compile() Migration
 
-**Domain:** TypeScript library — Tailwind-to-vanilla-CSS converter (milestone additions)
+**Project:** Vanillify v2.0 Engine Swap
 **Researched:** 2026-04-05
-**Confidence:** MEDIUM-HIGH (vite-plus and magic-regexp HIGH, @theme support MEDIUM due to needing custom layer)
+**Scope:** Engine swap only. oxc-parser, citty, consola, tsdown, vitest are KEEPING -- not re-researched.
 
-**Scope:** This document covers ONLY the new stack additions for v1.1. For the existing validated stack (UnoCSS createGenerator, oxc-parser, citty, consola), see the v1.0 research archive.
+## Recommended Stack Changes
 
----
-
-## New Stack Additions
-
-### 1. vite-plus (Unified Toolchain)
+### ADD: Tailwind CSS (the engine replacement)
 
 | Technology | Version | Purpose | Why |
 |------------|---------|---------|-----|
-| `vite-plus` | ^0.1.15 | Unified config for build, test, lint, format | Replaces separate tsdown.config.ts, vitest.config.ts, eslint config, and prettier config with a single `vite.config.ts`. tsdown, vitest, oxlint, and oxfmt are all managed under one `defineConfig`. This is the direction the VoidZero ecosystem is going — vanillify should adopt it now rather than accumulate config debt. |
+| `tailwindcss` | `4.2.2` | CSS generation engine via `compile().build()` | The bare `tailwindcss` package exports `compile()` directly. It accepts a CSS string + optional `loadStylesheet`/`loadModule` callbacks, returning a compiler with `build(candidates: string[]): string`. This is a pure async function with no filesystem side effects when you provide your own loaders. Zero peer dependencies. Verified working 2026-04-05. |
 
-**Confidence:** HIGH — Official VoidZero project, active development, migration path documented.
+### REMOVE: UnoCSS packages
 
-#### defineConfig API
+| Package | Current Version | Why Remove |
+|---------|----------------|------------|
+| `@unocss/core` | `^66.6.7` | Replaced by `tailwindcss` `compile()`. The `createGenerator` approach was a workaround for Tailwind lacking a programmatic API. Tailwind v4 now has one. |
+| `@unocss/preset-wind4` | `^66.6.7` | No longer needed. Was providing Tailwind v4 utility rules to UnoCSS. Native Tailwind handles its own utilities. |
 
-```typescript
-import { defineConfig } from 'vite-plus'
+### REMOVE: Custom translation layer dependencies (candidates)
 
-export default defineConfig({
-  // --- Standard Vite ---
-  server: {},
-  build: {},
-  preview: {},
+| Package | Current Version | Why Remove |
+|---------|----------------|------------|
+| `magic-regexp` | `^0.11.0` | Used in variant parsing (`src/variants/parser.ts`), custom variant resolution, and some extraction code. The entire `src/variants/` and `src/theme/` directories are being deleted since Tailwind handles `@custom-variant` and `@theme` natively. Evaluate during migration whether any remaining uses in `extractor.ts`, `rewriter.ts`, or `generator.ts` can be replaced with simple regex or removed entirely. |
 
-  // --- Vite+ extensions ---
-  pack: {
-    // tsdown config moves here
-    entry: ['src/index.ts'],
-    dts: true,
-    format: ['esm', 'cjs'],
-  },
-  test: {
-    // vitest config moves here
-    environment: 'node',
-    coverage: { provider: 'v8' },
-  },
-  lint: {
-    // oxlint config — replaces @antfu/eslint-config + oxlint
-  },
-  fmt: {
-    // oxfmt config — replaces prettier
-  },
-  staged: {
-    // replaces lint-staged
-    '*.{js,ts,tsx}': 'vp check --fix',
-  },
-  run: {
-    // vite task runner
-  },
-})
-```
+### KEEP: Everything else
 
-#### CLI Commands
+| Package | Version | Role | Notes |
+|---------|---------|------|-------|
+| `oxc-parser` | `^0.123.0` | AST-based class extraction | Unchanged. Still the best JSX/TSX parser. |
+| `oxc-walker` | `^0.7.0` | AST traversal | Unchanged. Pairs with oxc-parser. |
+| `citty` | `^0.2.2` | CLI argument parsing | Unchanged. |
+| `consola` | `^3.4.2` | Terminal output | Unchanged. |
+| `pathe` | `^2.0.3` | Cross-platform paths | Unchanged. |
+| `tinyglobby` | `^0.2.15` | Glob expansion for CLI | Unchanged. |
 
-| Command | Replaces | Notes |
-|---------|----------|-------|
-| `vp pack` | `tsdown` | Builds the library with tsdown under the hood |
-| `vp test` | `vitest run` | Single test pass (NOT watch by default) |
-| `vp test --watch` | `vitest` | Watch mode |
-| `vp lint` | `eslint` / `oxlint` | Uses Oxlint (600+ ESLint-compatible rules, 100x faster) |
-| `vp fmt` | `prettier` | Uses Oxfmt (99%+ Prettier compatible) |
-| `vp check` | `vp lint && vp fmt` | Combined lint + format |
-| `vp build` | `vite build` | Standard Vite build |
+## The `tailwindcss` vs `@tailwindcss/node` Decision
 
-#### Migration Path
+**Use `tailwindcss` (bare package). Do NOT use `@tailwindcss/node`.**
 
-The `vp migrate` command automates most of the transition:
+### Why bare `tailwindcss`
 
-1. Run `vp migrate` in the project root
-2. It merges tsdown.config.ts into the `pack` block
-3. It merges vitest.config.ts into the `test` block
-4. It updates lint/format configs into `lint`/`fmt` blocks
-5. Updates `package.json` scripts to use `vp` commands
-6. Test imports change: `import { describe, it, expect } from 'vite-plus/test'`
+The bare `tailwindcss` package (v4.2.2) exports `compile()` with optional `loadStylesheet` and `loadModule` callbacks. This is the right choice because:
 
-**Critical change:** Vitest imports move from `'vitest'` to `'vite-plus/test'`. This is the main code change beyond config consolidation.
+1. **No filesystem coupling.** The bare package lets vanillify provide its own `loadStylesheet` callback. The CSS input string (including `@import "tailwindcss"`, `@theme`, `@custom-variant`) is passed directly to `compile()`. No temp files, no directory scanning, no implicit behavior.
 
-#### What Gets Removed
+2. **Zero dependencies.** The `tailwindcss` package has NO runtime dependencies. It ships self-contained with Lightning CSS bundled in. Compare to `@tailwindcss/node` which pulls in `jiti`, `enhanced-resolve`, `lightningcss` (separate), `magic-string`, `source-map-js`, and `@jridgewell/remapping`.
 
-| Remove | Replaced By |
-|--------|------------|
-| `tsdown.config.ts` | `pack` block in `vite.config.ts` |
-| `vitest.config.ts` | `test` block in `vite.config.ts` |
-| `.eslintrc` / `eslint.config.js` | `lint` block in `vite.config.ts` |
-| `.prettierrc` | `fmt` block in `vite.config.ts` |
-| `@antfu/eslint-config` (devDep) | Built-in Oxlint |
-| `oxlint` (separate devDep) | Built into vite-plus |
-| `prettier` (devDep) | Built-in Oxfmt |
+3. **Stable public API.** The `compile` and `compileAst` functions are the documented public exports (along with `__unstable__loadDesignSystem`, plugin helpers, and CSS entry points). The `@tailwindcss/node` package is an internal implementation detail of the CLI and Vite plugin -- its `CompileOptions` has a different shape (required `base`, required `onDependency`) and could change without notice.
 
----
-
-### 2. magic-regexp (Readable Regex)
-
-| Technology | Version | Purpose | Why |
-|------------|---------|---------|-----|
-| `magic-regexp` | ^0.11.0 | Type-safe, readable regex alternative | From the UnJS ecosystem (same as citty, consola, pathe). Compiles away at build time to pure RegExp — zero runtime overhead. Replaces raw regex patterns throughout vanillify with readable, chainable, typed expressions. Particularly valuable for CSS class pattern matching where regex correctness is critical. |
-
-**Confidence:** HIGH — Stable UnJS package, well-documented, zero runtime cost.
-
-#### Core API
+### `@tailwindcss/node` CompileOptions vs `tailwindcss` CompileOptions
 
 ```typescript
-import {
-  createRegExp,
-  exactly,
-  oneOrMore,
-  maybe,
-  anyOf,
-  digit,
-  word,
-  wordChar,
-  whitespace,
-  char,
-  charIn,
-  charNotIn,
-  not,
-} from 'magic-regexp'
-```
+// tailwindcss (bare) -- all optional
+type CompileOptions = {
+  base?: string;
+  from?: string;
+  polyfills?: Polyfills;
+  loadModule?: (id: string, base: string, resourceHint: 'plugin' | 'config') => Promise<{
+    path: string; base: string; module: Plugin | Config;
+  }>;
+  loadStylesheet?: (id: string, base: string) => Promise<{
+    path: string; base: string; content: string;
+  }>;
+};
 
-#### Pattern Composition
-
-```typescript
-// Chaining methods on any Input:
-pattern
-  .and(otherPattern)        // sequential concatenation
-  .or(alternative)          // alternation
-  .times(3)                 // exact repetition
-  .times.between(1, 5)     // range
-  .times.atLeast(1)        // minimum
-  .times.any()             // zero or more (*)
-  .optionally()            // zero or one (?)
-  .groupedAs('name')       // named capture group
-  .grouped()               // anonymous capture group
-  .after(lookbehind)       // positive lookbehind
-  .before(lookahead)       // positive lookahead
-  .notAfter(pattern)       // negative lookbehind
-  .notBefore(pattern)      // negative lookahead
-  .at.lineStart()          // ^ anchor
-  .at.lineEnd()            // $ anchor
-```
-
-#### Example: Replacing Vanillify Regex Patterns
-
-```typescript
-// BEFORE: Raw regex for matching Tailwind class strings
-const classRegex = /class(?:Name)?=["']([^"']+)["']/g
-
-// AFTER: magic-regexp equivalent
-const classPattern = createRegExp(
-  exactly('class')
-    .and(maybe(exactly('Name')))
-    .and(exactly('='))
-    .and(charIn(`"'`))
-    .and(oneOrMore(charNotIn(`"'`)).groupedAs('classes'))
-    .and(charIn(`"'`)),
-  ['g']
-)
-
-// BEFORE: CSS variable pattern
-const cssVarRegex = /var\(--[\w-]+\)/
-
-// AFTER:
-const cssVarPattern = createRegExp(
-  exactly('var(--')
-    .and(oneOrMore(anyOf(wordChar, exactly('-'))))
-    .and(exactly(')'))
-)
-```
-
-#### Build-Time Compilation
-
-magic-regexp ships with a transform (unplugin-based) that compiles the readable patterns to pure RegExp at build time. With vite-plus, this integrates naturally since tsdown (via `vp pack`) supports unplugin transforms.
-
-**However:** For a library, the transform is optional. Without it, magic-regexp still works at runtime with minimal overhead (just the builder functions). The compiled-away behavior is a bonus, not a requirement.
-
-#### Limitations
-
-- No lookbehind on older engines (but we target Node 20+ which supports it)
-- Pattern debugging requires understanding what the builder produces — use `.toString()` on the result to see the raw regex
-- Complex patterns (deeply nested alternations) can be harder to read than raw regex — use judgment on when magic-regexp adds clarity vs obscures intent
-
----
-
-### 3. pnpm (Package Manager)
-
-| Technology | Version | Purpose | Why |
-|------------|---------|---------|-----|
-| `pnpm` | ^9.x | Package manager | Strict dependency isolation (prevents phantom dependencies), content-addressable store (faster installs, less disk usage), and it's the standard in the VoidZero/Vite ecosystem. vite-plus itself manages pnpm as a runtime concern. |
-
-**Confidence:** HIGH — Standard migration, well-documented, no compatibility concerns.
-
-#### Migration Steps
-
-```bash
-# 1. Install pnpm globally (if not already)
-npm install -g pnpm
-
-# 2. Import existing lockfile
-pnpm import  # Creates pnpm-lock.yaml from package-lock.json
-
-# 3. Remove npm artifacts
-rm -rf node_modules package-lock.json
-
-# 4. Install with pnpm
-pnpm install
-
-# 5. Verify
-pnpm test
-pnpm build
-```
-
-#### Config Changes
-
-Create `.npmrc` for pnpm settings:
-
-```ini
-# .npmrc
-shamefully-hoist=false
-strict-peer-dependencies=true
-auto-install-peers=true
-```
-
-**Note on shamefully-hoist:** Set to `false` (default). Vanillify's deps are all well-packaged (UnoCSS, oxc-parser, UnJS packages) and don't rely on phantom hoisting. If a dep breaks under strict mode, it's a bug to fix, not a reason to hoist.
-
-#### Package.json Script Updates
-
-```json
-{
-  "scripts": {
-    "build": "vp pack",
-    "test": "vp test",
-    "lint": "vp lint",
-    "fmt": "vp fmt",
-    "check": "vp check"
-  },
-  "packageManager": "pnpm@9.15.0"
+// @tailwindcss/node -- base and onDependency required, has filesystem resolvers
+interface CompileOptions {
+  base: string;                    // REQUIRED
+  from?: string;
+  onDependency: (path: string) => void;  // REQUIRED
+  shouldRewriteUrls?: boolean;
+  polyfills?: Polyfills;
+  customCssResolver?: Resolver;
+  customJsResolver?: Resolver;
 }
 ```
 
-The `packageManager` field enables Corepack enforcement — anyone cloning the repo and running `corepack enable` will automatically use the correct pnpm version.
+The bare package is clearly designed for programmatic use. The `@tailwindcss/node` package is designed for build tools that operate on the filesystem.
 
-#### Compatibility Notes
+## Compile API Details
 
-- `oxc-parser` ships platform-specific binaries via `optionalDependencies` — pnpm handles this correctly
-- `@unocss/*` packages are all published with proper peer dependency declarations — no hoisting issues expected
-- `vite-plus` is designed to work with pnpm (VoidZero dogfoods pnpm)
-- No workspace file needed (vanillify is a single package, not a monorepo)
+### Function Signature (verified from `tailwindcss@4.2.2` type definitions)
 
----
+```typescript
+import { compile } from 'tailwindcss';
 
-### 4. Tailwind v4 @theme Block Support
+const compiler = await compile(css: string, opts?: CompileOptions);
+// Returns:
+// {
+//   sources: { base: string; pattern: string; negated: boolean }[];
+//   root: null | 'none' | { base: string; pattern: string };
+//   features: Features;
+//   build(candidates: string[]): string;
+//   buildSourceMap(): DecodedSourceMap;
+// }
+```
 
-| Technology | Version | Purpose | Why |
-|------------|---------|---------|-----|
-| UnoCSS `theme` config + `extendTheme` | (uses existing `@unocss/core` ^66.x) | Map Tailwind v4 `@theme` blocks to UnoCSS theme configuration | preset-wind4 does NOT support `@theme` blocks natively. Vanillify must parse `@theme` CSS blocks itself and translate them to UnoCSS's programmatic `theme` object. This is the same pattern as the `@custom-variant` layer — vanillify bridges the gap between Tailwind v4 CSS syntax and UnoCSS's JS config. |
+### The `loadStylesheet` Callback
 
-**Confidence:** MEDIUM — The approach is sound (UnoCSS theme API is stable), but the mapping from Tailwind v4 theme variables to UnoCSS theme keys requires careful implementation.
+When the CSS input contains `@import "tailwindcss"`, the engine calls `loadStylesheet("tailwindcss", base)`. Vanillify must resolve this to the actual CSS file inside `node_modules/tailwindcss/index.css`.
 
-#### The @theme Question: Definitive Answer
+Minimal implementation:
 
-**Does preset-wind4 handle Tailwind v4 `@theme` blocks natively? NO.**
+```typescript
+import { compile } from 'tailwindcss';
+import { readFileSync } from 'node:fs';
+import { resolve, dirname } from 'node:path';
+import { createRequire } from 'node:module';
 
-Evidence:
-1. The UnoCSS issue #4411 (Tailwind 4 Support Plan) lists "Integrate css configuration file" as an outstanding/incomplete task — this is what `@theme` blocks are.
-2. The preset-wind4 documentation describes theme configuration exclusively through JavaScript objects (`presetWind4({ theme: {} })`), with no mention of CSS-based `@theme` parsing.
-3. The UnoCSS theme documentation shows only programmatic `theme` and `extendTheme` APIs.
-4. The maintainer explicitly stated preset-wind4 is "not fully ready yet" — CSS config file support (which includes `@theme`) is the primary gap.
+const require = createRequire(import.meta.url);
 
-**Does preset-wind3 handle it? NO.** `@theme` is a Tailwind v4 feature. Wind3 targets Tailwind v3 semantics which used `tailwind.config.js`, not CSS-based theme configuration.
+const loadStylesheet = async (id: string, base: string) => {
+  const resolvedPath = id.startsWith('.') || id.startsWith('/')
+    ? resolve(base, id)
+    : require.resolve(id.endsWith('.css') ? id : id + '/index.css');
+  const content = readFileSync(resolvedPath, 'utf-8');
+  return { path: resolvedPath, base: dirname(resolvedPath), content };
+};
+```
 
-#### What Tailwind v4 @theme Actually Does
+**Note:** The `loadStylesheet` callback is recursive -- Tailwind's `index.css` itself imports `./theme.css`, `./preflight.css`, and `./utilities.css` via relative paths. The callback handles those via the `id.startsWith('.')` branch.
+
+### The `loadModule` Callback
+
+Only needed if users provide JS plugins or config files via `@plugin` or `@config` directives in their CSS. For vanillify v2.0, this is NOT needed initially. The engine swap focuses on `@import`, `@theme`, `@custom-variant`, and utility generation.
+
+If needed later, signature is:
+```typescript
+loadModule: async (id: string, base: string, resourceHint: 'plugin' | 'config') => {
+  // Resolve and dynamically import the module
+  return { path: resolvedPath, base: dirname(resolvedPath), module: importedModule };
+}
+```
+
+### `source(none)` Directive
+
+**Critical for vanillify's use case.** Adding `source(none)` to the import disables Tailwind's automatic filesystem scanning for class names:
 
 ```css
-@import "tailwindcss";
+@import "tailwindcss" source(none);
+```
 
+Without this, Tailwind would try to scan the project directory for files containing class names. Vanillify already extracts class names via oxc-parser -- it passes them directly to `build()`. The `source(none)` directive tells Tailwind: "I will give you the candidates, do not scan anything."
+
+**Must be applied to each import if using split imports:**
+```css
+@import "tailwindcss/theme" source(none);
+@import "tailwindcss/preflight" source(none);
+@import "tailwindcss/utilities" source(none);
+```
+
+## CSS Input Patterns for Vanillify
+
+### Default (full Tailwind with user theme/variants)
+
+```css
+@import "tailwindcss" source(none);
+
+/* User's @theme block (if provided) */
 @theme {
-  --color-primary: #3490dc;
-  --color-secondary: #ffed4a;
-  --font-display: "Inter", sans-serif;
-  --spacing-18: 4.5rem;
-  --radius-pill: 9999px;
+  --color-brand: #ff6600;
 }
+
+/* User's @custom-variant definitions (if provided) */
+@custom-variant ui-checked (&[data-checked]);
 ```
 
-`@theme` blocks define CSS custom properties that serve a dual purpose:
-1. They become CSS variables available at runtime (`var(--color-primary)`)
-2. They instruct Tailwind to generate corresponding utility classes (`text-primary`, `bg-secondary`, `font-display`, `spacing-18`, `rounded-pill`)
+### Utilities-only (no preflight, no base styles)
 
-The variable naming convention maps to utility classes: `--color-*` maps to color utilities, `--font-*` to font utilities, `--spacing-*` to spacing utilities, etc.
-
-#### Vanillify's Approach: Parse @theme, Feed UnoCSS Theme API
-
-```typescript
-// Step 1: Parse @theme block from user's CSS (using regex or a simple CSS parser)
-// Input: "@theme { --color-primary: #3490dc; --spacing-18: 4.5rem; }"
-// Output: { colors: { primary: '#3490dc' }, spacing: { '18': '4.5rem' } }
-
-// Step 2: Map Tailwind v4 variable names to UnoCSS theme keys
-// Tailwind v4 --color-*  → UnoCSS theme.colors.*
-// Tailwind v4 --font-*   → UnoCSS theme.font.*        (Wind4 key)
-// Tailwind v4 --spacing-* → UnoCSS theme.spacing.*
-// Tailwind v4 --radius-*  → UnoCSS theme.radius.*      (Wind4 key)
-// Tailwind v4 --text-*    → UnoCSS theme.text.*         (Wind4 key)
-
-// Step 3: Pass to createGenerator
-import { createGenerator } from '@unocss/core'
-import presetWind4 from '@unocss/preset-wind4'
-
-const generator = createGenerator({
-  presets: [presetWind4()],
-  theme: parsedThemeObject,        // from step 2
-  // OR use extendTheme for merging:
-  extendTheme: (defaultTheme) => ({
-    ...defaultTheme,
-    colors: { ...defaultTheme.colors, ...parsedColors },
-  }),
-})
+```css
+@import "tailwindcss/theme" source(none);
+@import "tailwindcss/utilities" source(none);
 ```
 
-#### UnoCSS Theme API (What We Use)
+**Note:** The theme import is required even for utilities-only mode because color utilities like `bg-red-500` resolve to `var(--color-red-500)` which is defined in the theme layer. Without theme, only non-theme-dependent utilities like `flex` and `hidden` work.
 
-**`theme` object in config:**
-```typescript
-createGenerator({
-  presets: [presetWind4()],
-  theme: {
-    colors: {
-      primary: '#3490dc',
-      brand: {
-        DEFAULT: '#942192',
-        light: '#B74BC9',
-      },
-    },
-    spacing: {
-      '18': '4.5rem',
-    },
-    font: {
-      display: '"Inter", sans-serif',
-    },
-    radius: {
-      pill: '9999px',
-    },
-  },
-})
-```
+## Verified Behavior (tested 2026-04-05 against tailwindcss@4.2.2)
 
-**`extendTheme` function:**
-```typescript
-createGenerator({
-  presets: [presetWind4()],
-  extendTheme: (theme) => {
-    // Mutate in place
-    theme.colors.primary = '#3490dc'
-    // OR return new object
-    return { ...theme, colors: { ...theme.colors, custom: '#fff' } }
-  },
-})
-```
+| Feature | Works? | Confidence | Notes |
+|---------|--------|------------|-------|
+| `compile().build(candidates)` | YES | HIGH | Tested: returns CSS string for given class names |
+| `source(none)` disables scanning | YES | HIGH | No filesystem access when `source(none)` is used |
+| `@theme` blocks | YES | HIGH | Custom theme values appear in `:root, :host` and utilities resolve them |
+| `@custom-variant` | YES | HIGH | `@custom-variant ui-checked (&[data-checked])` produces correct `&[data-checked]` selectors |
+| Responsive variants (`sm:`, `md:`) | YES | HIGH | Produces `@media (width >= 40rem)` etc. |
+| State variants (`hover:`, `focus:`) | YES | HIGH | Produces `&:hover { @media (hover: hover) { ... } }` |
+| `dark:` variant | YES | HIGH | Produces `@media (prefers-color-scheme: dark)` |
+| Arbitrary values (`bg-[#ff0000]`) | NOT TESTED | MEDIUM | Expected to work -- native Tailwind feature |
+| CSS nesting in output | YES | HIGH | Output uses native CSS nesting (`&:hover { ... }`) rather than flat selectors |
+| Theme-only variables in output | YES | HIGH | Only theme variables actually used by requested candidates appear in `:root` |
 
-The theme object is also available in rule contexts via `({ theme }) => ...`, which means custom rules can reference theme values dynamically.
+## CSS Output Differences from UnoCSS
 
-#### Wind4 Theme Key Mapping (Critical)
+The Tailwind compile output differs from UnoCSS output in ways that affect vanillify:
 
-Wind4 restructured theme keys from Wind3. The mapping from Tailwind v4 `@theme` variable prefixes to Wind4 theme keys:
+1. **CSS nesting.** Tailwind v4 outputs native CSS nesting (`.hover\:text-white { &:hover { ... } }`). UnoCSS outputs flat selectors (`.hover\:text-white:hover { ... }`). This is a **breaking change in output format** but is valid modern CSS.
 
-| Tailwind v4 `@theme` prefix | UnoCSS Wind4 theme key | Notes |
-|------------------------------|----------------------|-------|
-| `--color-*` | `colors.*` | Same as Wind3 |
-| `--font-*` | `font.*` | Wind3 used `fontFamily` |
-| `--text-*` (fontSize) | `text.fontSize.*` | Wind3 used `fontSize` at root |
-| `--leading-*` | `text.lineHeight.*` or `leading.*` | Restructured in Wind4 |
-| `--tracking-*` | `text.letterSpacing.*` or `tracking.*` | Restructured in Wind4 |
-| `--radius-*` | `radius.*` | Wind3 used `borderRadius` |
-| `--spacing-*` | `spacing.*` | Unified in Wind4 |
-| `--ease-*` | `ease.*` | Wind3 used `easing` |
-| `--breakpoint-*` | `breakpoint.*` | Wind3 used `breakpoints` |
-| `--shadow-*` | `shadow.*` | Same concept |
-| `--animate-*` | `animation.*` | TBD — verify |
+2. **Theme variables.** Tailwind outputs `var(--color-red-500)` referencing theme CSS custom properties. UnoCSS with preset-wind4 may inline or reference differently. The theme layer in output now includes a `:root, :host { }` block with only the variables used by requested candidates.
 
-**Risk:** This mapping table needs validation against actual Wind4 behavior. Some keys may not produce the expected utility classes. Build a test suite for each prefix early.
+3. **Layer structure.** Output is wrapped in `@layer theme, base, components, utilities;` with `@layer utilities { ... }`. UnoCSS output does not use CSS layers by default.
 
----
+4. **Preflight.** Full `@import "tailwindcss"` includes Tailwind's preflight (reset CSS) in the `@layer base` section. Vanillify may want to strip this or offer an option to exclude it.
 
-## Updated Installation
+## Package Size Impact
+
+| Change | Size Impact |
+|--------|-------------|
+| Remove `@unocss/core` | -~2.5 MB (node_modules) |
+| Remove `@unocss/preset-wind4` | -~1 MB (node_modules) |
+| Add `tailwindcss` | +~8 MB (node_modules, includes Lightning CSS WASM/native) |
+| Net | +~4.5 MB node_modules, BUT zero additional transitive deps |
+
+The `tailwindcss` package is larger but self-contained. The UnoCSS packages also pull in their own transitive dependencies. The net impact on end users is minimal since this is a build-time tool, not a runtime dependency.
+
+## Version Pinning Strategy
+
+Pin to `~4.2.2` (patch range) initially, not `^4.2.2`:
+
+- The `compile()` API is public but relatively new as a programmatic entry point.
+- Minor versions could add features that change output format (new layers, new CSS patterns).
+- Vanillify's tests should catch output changes, but a tighter pin reduces surprise.
+- Widen to `^4.x` after the migration is stable and tests confirm compatibility across minors.
+
+## Migration Integration Points
+
+### Generator simplification
+
+Current `src/pipeline/generator.ts` uses:
+- `createGenerator` from `@unocss/core` (instantiate)
+- `presetWind4` from `@unocss/preset-wind4` (configure)
+- `generator.generate(classNames)` (produce CSS)
+- Custom variant injection via UnoCSS `variants` config
+- Custom theme translation via UnoCSS theme config
+
+New generator (~40-50 lines):
+- `compile` from `tailwindcss` (instantiate with CSS string)
+- `compiler.build(classNames)` (produce CSS)
+- Theme: include `@theme` block in the CSS string (native)
+- Variants: include `@custom-variant` directives in the CSS string (native)
+
+### What the generator does NOT need to handle anymore
+
+- Theme key translation (UnoCSS theme format != Tailwind theme format) -- DELETE `src/theme/`
+- Custom variant object construction (UnoCSS `VariantObject` API) -- DELETE `src/variants/`
+- Preset configuration and matching -- Tailwind IS the preset
+- Cache key computation based on theme/variant config -- simplify to CSS string hash
+
+## Installation Commands
 
 ```bash
-# Install pnpm (if needed)
-npm install -g pnpm
+# Add
+pnpm add tailwindcss@~4.2.2
 
-# Core runtime dependencies (unchanged from v1.0)
-pnpm add @unocss/core @unocss/preset-wind4 oxc-parser
+# Remove
+pnpm remove @unocss/core @unocss/preset-wind4
 
-# CLI dependencies (unchanged)
-pnpm add citty consola pathe
-
-# NEW: Readable regex
-pnpm add magic-regexp
-
-# Dev dependencies — simplified by vite-plus
-pnpm add -D vite-plus typescript
-
-# Remove (replaced by vite-plus):
-# tsdown, vitest, @antfu/eslint-config, oxlint, prettier
+# Evaluate during migration (may also remove)
+# pnpm remove magic-regexp  # if no remaining uses after theme/variant deletion
 ```
-
-**Note:** `tsdown` and `vitest` are bundled inside `vite-plus` — do NOT install them separately. Installing both will cause version conflicts.
-
----
-
-## Alternatives Considered (New Additions Only)
-
-| Recommended | Alternative | Why Not |
-|-------------|-------------|---------|
-| `vite-plus` | Keep separate tsdown + vitest + eslint configs | Config proliferation. vite-plus consolidates 4-5 config files into one. The ecosystem is moving here — adopt now rather than migrate later with more config debt. |
-| `vite-plus` | `unbuild` + `vitest` + `eslint` | unbuild is solid but doesn't unify testing/linting. vite-plus gives the full unified experience. |
-| `magic-regexp` | Raw `RegExp` literals | Raw regex works but is hard to read, easy to get wrong, and not type-safe. magic-regexp compiles away so there's zero performance cost. For a tool that extracts CSS classes, regex correctness is critical — readability prevents bugs. |
-| `magic-regexp` | `verbal-expressions` | verbal-expressions is older, not type-safe, and not compiled-away. magic-regexp is from UnJS (same ecosystem as the rest of our stack). |
-| `pnpm` | `npm` | npm works but has no strict isolation (phantom deps possible), slower installs, more disk usage. pnpm is the standard in the VoidZero ecosystem. |
-| `pnpm` | `bun` | Bun is fast but its package manager has edge cases with native addons (oxc-parser ships native binaries). pnpm is the safe, standard choice. |
-| Custom @theme parser | Wait for preset-wind4 native support | The "Integrate css configuration file" task has been outstanding since April 2025 with no timeline. Vanillify can't wait indefinitely. The custom parser is straightforward (parse CSS custom properties, map to theme keys) and can be replaced if/when UnoCSS adds native support. |
-| Custom @theme parser | PostCSS plugin | Adding PostCSS as a dependency for parsing one CSS block is overkill. A simple CSS custom property parser (or even magic-regexp patterns) is sufficient for `@theme` blocks, which have a constrained, well-defined syntax. |
-
----
-
-## What NOT to Add
-
-| Avoid | Why | Use Instead |
-|-------|-----|-------------|
-| **Separate `tsdown` devDep** | Bundled inside vite-plus. Installing separately causes version conflicts. | `vp pack` command |
-| **Separate `vitest` devDep** | Bundled inside vite-plus. | `vp test` command, import from `'vite-plus/test'` |
-| **`@antfu/eslint-config`** | Replaced by Oxlint via vite-plus `lint` block. Oxlint is 50-100x faster. | `vp lint` command |
-| **`prettier`** | Replaced by Oxfmt via vite-plus `fmt` block. 99%+ Prettier compatible. | `vp fmt` command |
-| **PostCSS / `postcss-custom-properties`** | Overkill for parsing `@theme` blocks. Adds a large dependency tree for a simple task. | Simple CSS parser or magic-regexp patterns for `@theme` extraction |
-| **`css-tree` / `csstree`** | Full CSS parser is unnecessary. `@theme` blocks contain only `--variable: value;` pairs — flat key-value parsing. | Custom lightweight parser |
-| **`@unocss/preset-wind3` for @theme** | Wind3 targets Tailwind v3 which uses JS config, not CSS `@theme`. It won't help. | UnoCSS programmatic `theme` config |
-
----
-
-## Version Compatibility (Updated)
-
-| Package | Compatible With | Notes |
-|---------|-----------------|-------|
-| `vite-plus@^0.1.x` | `vite@^8.x`, `vitest@^4.1+` | Alpha but functional. Requires Vite 8+ and Vitest 4.1+. |
-| `magic-regexp@^0.11.x` | Any bundler with unplugin support | Transform is optional; works at runtime without it |
-| `pnpm@^9.x` | Node.js 20+ | Use Corepack for version pinning |
-| `@unocss/core@^66.x` | `@unocss/preset-wind4@^66.x` | Unchanged from v1.0 |
-| `oxc-parser@^0.123.x` | Node.js 20+, pnpm (native binaries work) | Unchanged |
-| `typescript@^5.5+` | `vite-plus@^0.1.x` | Still needed for `isolatedDeclarations` in pack |
-
----
-
-## Key Technical Risk: vite-plus Alpha Status
-
-**Confidence: MEDIUM-HIGH**
-
-vite-plus is at version 0.1.15 — clearly alpha/early. However:
-
-- It wraps stable tools (tsdown, vitest, oxlint, oxfmt) — it's a config unifier, not a reimplementation
-- The VoidZero team (Evan You) is actively developing it
-- The migration path is documented and reversible (you can always split configs back out)
-- The QwikDev/cli project (referenced in PROJECT.md) already uses vite-plus patterns
-
-**Mitigation:** If vite-plus has a blocking bug, each tool (tsdown, vitest, oxlint) can be used standalone. The `vite.config.ts` format is designed to be forward-compatible.
-
----
-
-## Key Technical Risk: @theme Mapping Completeness
-
-**Confidence: MEDIUM**
-
-The mapping from Tailwind v4 `@theme` variable naming to UnoCSS Wind4 theme keys is based on documentation, not runtime verification. Risks:
-
-1. Some theme key mappings may not produce the expected utilities
-2. Nested theme values (e.g., `--color-brand-primary`) need correct object nesting
-3. Wind4's theme structure differs from Tailwind v4's variable naming in some areas
-4. Default theme values (Tailwind v4 ships defaults via `@theme`) need to be handled — vanillify should only process user-defined `@theme` blocks, not Tailwind's internal defaults
-
-**Mitigation:** Build a mapping test suite early. For each `@theme` variable prefix, verify that the corresponding UnoCSS theme key produces the correct utility class CSS.
-
----
 
 ## Sources
 
-- [vite-plus npm](https://www.npmjs.com/package/vite-plus) — version 0.1.15
-- [vite-plus GitHub](https://github.com/voidzero-dev/vite-plus) — unified toolchain repo
-- [vite-plus Config Docs](https://viteplus.dev/config/) — defineConfig API (pack, lint, fmt, test, staged, run)
-- [vite-plus Migration Guide](https://viteplus.dev/guide/migrate) — `vp migrate` command, tool-specific migration steps
-- [Announcing Vite+](https://voidzero.dev/posts/announcing-vite-plus) — ecosystem context
-- [magic-regexp npm](https://www.npmjs.com/package/magic-regexp) — version 0.11.0
-- [magic-regexp Docs](https://regexp.dev/) — API reference, usage guide
-- [magic-regexp GitHub](https://github.com/unjs/magic-regexp) — UnJS ecosystem
-- [magic-regexp Usage Guide](https://regexp.dev/guide/usage) — createRegExp, helpers, chaining API
-- [UnoCSS Theme Config](https://unocss.dev/config/theme) — `theme` object, `extendTheme` API
-- [UnoCSS preset-wind4 Docs](https://unocss.dev/presets/wind4) — theme key structure, Wind4-specific changes
-- [UnoCSS Issue #4411](https://github.com/unocss/unocss/issues/4411) — Tailwind 4 Support Plan, "Integrate css configuration file" still outstanding
-- [Tailwind v4 Theme Variables](https://tailwindcss.com/docs/theme) — `@theme` block syntax, variable naming conventions
-- [pnpm Migration](https://pnpm.io/cli/import) — `pnpm import` from package-lock.json
-
----
-
-*Stack research for: vanillify v1.1 — vite-plus, magic-regexp, pnpm, @theme support*
-*Researched: 2026-04-05*
+- [tailwindcss@4.2.2 npm page](https://www.npmjs.com/package/tailwindcss) -- version, exports field, zero dependencies (verified via `npm view`)
+- [@tailwindcss/node@4.2.2 npm page](https://www.npmjs.com/package/@tailwindcss/node) -- dependencies: jiti, enhanced-resolve, lightningcss, magic-string, source-map-js, @jridgewell/remapping (verified via `npm view`)
+- [GitHub Discussion #16581: Using Tailwind v4 programmatically](https://github.com/tailwindlabs/tailwindcss/discussions/16581) -- compile() API usage patterns
+- [GitHub Discussion #15881: Compiling Tailwind v4 programmatically](https://github.com/tailwindlabs/tailwindcss/discussions/15881) -- PostCSS vs compile() approaches
+- [Tailwind CSS Functions and Directives docs](https://tailwindcss.com/docs/functions-and-directives) -- `source(none)`, `@theme`, `@custom-variant` syntax
+- [Tailwind CSS Detecting Classes docs](https://tailwindcss.com/docs/detecting-classes-in-source-files) -- `source(none)` directive details
+- `tailwindcss@4.2.2` type definitions (`dist/lib.d.mts`) -- compile() signature, CompileOptions, build() return type (read directly from installed package)
+- `@tailwindcss/node@4.2.2` type definitions (`dist/index.d.ts`) -- CompileOptions differences (read directly from installed package)
+- Local verification tests (2026-04-05) -- compile/build with `source(none)`, `@theme`, `@custom-variant`, responsive/state/dark variants all confirmed working
