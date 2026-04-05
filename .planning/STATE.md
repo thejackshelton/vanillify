@@ -28,7 +28,7 @@ See: .planning/PROJECT.md (updated 2026-04-05)
 Phase: Not started (defining requirements)
 Plan: —
 Status: Defining requirements
-Last activity: 2026-04-05 — Milestone v1.1 started
+Last activity: 2026-04-05 - Completed quick task 260405-c9j: Create a README for the vanillify project
 
 ## Performance Metrics
 
@@ -91,6 +91,12 @@ None yet.
 - Phase 1: Validate `generate()` input contract early — whether passing minimal HTML wrapper vs. full JSX source produces different output is untested (Pitfall 7 from research)
 - Phase 1: Build preset-wind4 class-coverage test matrix against Tailwind v4 docs to surface gaps before shipping
 - Phase 2: `@custom-variant` → UnoCSS variant format translation is underdocumented — may need design work before implementation
+
+### Quick Tasks Completed
+
+| # | Description | Date | Commit | Directory |
+|---|-------------|------|--------|-----------|
+| 260405-c9j | Create a README for the vanillify project | 2026-04-05 | 18d5f8f | [260405-c9j-create-a-readme-for-the-vanillify-projec](./quick/260405-c9j-create-a-readme-for-the-vanillify-projec/) |
 
 ## Session Continuity
 
