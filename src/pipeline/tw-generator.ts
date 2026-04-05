@@ -24,8 +24,8 @@ async function loadStylesheet(id: string, base: string) {
 }
 
 // --- Compiler cache [ENG-04] ---
-type TwCompiler = Awaited<ReturnType<typeof compile>>;
-export const _cache: Map<string, TwCompiler> = new Map();
+// eslint-disable-next-line @typescript-eslint/no-explicit-any -- internal cache exposed for test inspection only
+export const _cache: Map<string, any> = new Map();
 
 /**
  * Simple djb2 hash for cache key differentiation.
