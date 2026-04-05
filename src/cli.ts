@@ -47,31 +47,39 @@ const main = defineCommand({
       customVariantsCSS = await readFile(resolve(args.customVariants), 'utf-8')
     }
 
+    const options = customVariantsCSS
+      ? { customVariants: customVariantsCSS }
+      : undefined
+
+    let processed = 0
     for (const file of files) {
-      const absPath = resolve(file)
-      const source = await readFile(absPath, 'utf-8')
+      try {
+        const absPath = resolve(file)
+        const source = await readFile(absPath, 'utf-8')
 
-      const options = customVariantsCSS
-        ? { customVariants: customVariantsCSS }
-        : undefined
+        const result = await convert(source, file, options)
 
-      const result = await convert(source, file, options)
+        // Determine output paths -- never overwrite originals
+        const dir = args.outDir ? resolve(args.outDir) : dirname(absPath)
+        const name = basename(file).replace(/\.(tsx?|jsx?)$/, '')
+        const ext = file.match(/\.(tsx?|jsx?)$/)?.[0] ?? '.tsx'
 
-      // Determine output paths -- never overwrite originals
-      const dir = args.outDir ? resolve(args.outDir) : dirname(absPath)
-      const name = basename(file).replace(/\.(tsx?|jsx?)$/, '')
+        await mkdir(dir, { recursive: true })
+        await writeFile(join(dir, `${name}.vanilla.css`), result.css)
+        await writeFile(join(dir, `${name}.vanilla${ext}`), result.component)
 
-      await mkdir(dir, { recursive: true })
-      await writeFile(join(dir, `${name}.vanilla.css`), result.css)
-      await writeFile(join(dir, `${name}.vanilla.tsx`), result.component)
-
-      // Report warnings
-      for (const w of result.warnings) {
-        consola.warn(`${file}: ${w.message}`)
+        // Report warnings
+        for (const w of result.warnings) {
+          consola.warn(`${file}: ${w.message}`)
+        }
+        processed++
+      }
+      catch (err) {
+        consola.error(`Failed to process ${file}: ${err instanceof Error ? err.message : err}`)
       }
     }
 
-    consola.success(`Processed ${files.length} file(s)`)
+    consola.success(`Processed ${processed}/${files.length} file(s)`)
   },
 })
 
