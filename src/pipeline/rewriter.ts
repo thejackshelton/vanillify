@@ -218,7 +218,7 @@ function matchesAnyPattern(line: string, patterns: string[]): boolean {
       if (line.includes(pattern.replace(/\\\\/g, '\\'))) return true
     }
   }
-  return true // Default: assume it's a matching utility rule
+  return true // Default: include unmatched rules — per-node CSS isolation prevents false positives
 }
 
 /**

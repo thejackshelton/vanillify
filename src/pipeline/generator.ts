@@ -8,7 +8,7 @@ let _generator: Awaited<ReturnType<typeof createGenerator>> | null = null
 /**
  * Get or create the singleton UnoCSS generator with preset-wind4.
  */
-export async function getGenerator() {
+export async function getGenerator(): Promise<Awaited<ReturnType<typeof createGenerator>>> {
   if (!_generator) {
     _generator = await createGenerator({
       presets: [presetWind4()],
