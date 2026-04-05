@@ -1,0 +1,10 @@
+[
+  {
+    "type": "unsupported-theme-reset",
+    "message": "Unsupported @theme reset for \"--color-brand\": initial values are not supported",
+    "location": {
+      "line": 0,
+      "column": 0
+    }
+  }
+]

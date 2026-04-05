@@ -24,27 +24,21 @@ async function loadStylesheet(id: string, base: string) {
 }
 
 // --- Compiler cache [ENG-04] ---
+// Cache by full CSS input string (no hash — avoids collision risk)
 // eslint-disable-next-line @typescript-eslint/no-explicit-any -- internal cache exposed for test inspection only
 export const _cache: Map<string, any> = new Map();
 
 /**
- * Simple djb2 hash for cache key differentiation.
- * O(n) string hash -- no crypto overhead.
+ * Get a fresh compiler for the given CSS input, with caching.
+ * IMPORTANT: Tailwind's build() is cumulative on a compiler instance —
+ * candidates from prior build() calls persist. We cache the *compiled*
+ * state but must account for cumulative behavior in detectMatches().
  */
-function simpleHash(str: string): string {
-  let hash = 5381;
-  for (let i = 0; i < str.length; i++) {
-    hash = ((hash << 5) + hash + str.charCodeAt(i)) | 0;
-  }
-  return (hash >>> 0).toString(36);
-}
-
 async function getCompiler(cssInput: string) {
-  const key = simpleHash(cssInput);
-  let compiler = _cache.get(key);
+  let compiler = _cache.get(cssInput);
   if (!compiler) {
     compiler = await compile(cssInput, { loadStylesheet });
-    _cache.set(key, compiler);
+    _cache.set(cssInput, compiler);
   }
   return compiler;
 }
@@ -58,24 +52,56 @@ function extractLayers(output: string): {
   const themeMatch = output.match(/@layer theme \{([\s\S]*?)\}\s*(?=@layer)/);
   const themeCss = themeMatch ? themeMatch[1].trim() : "";
 
-  // Utilities layer: @layer utilities { ... } at end of output
-  const utilMatch = output.match(/@layer utilities \{([\s\S]*)\}\s*$/);
-  const utilityCss = utilMatch ? utilMatch[1].trim() : "";
+  // Utilities layer: extract content between @layer utilities { and its matching close brace.
+  // Cannot use greedy .* because trailing @property/@layer properties blocks may follow.
+  // Use brace-counting to find the matching close brace.
+  const utilStart = output.indexOf("@layer utilities {");
+  let utilityCss = "";
+  if (utilStart !== -1) {
+    const contentStart = utilStart + "@layer utilities {".length;
+    let depth = 1;
+    let i = contentStart;
+    while (i < output.length && depth > 0) {
+      if (output[i] === "{") depth++;
+      else if (output[i] === "}") depth--;
+      i++;
+    }
+    // i now points past the matching }, content is between contentStart and i-1
+    utilityCss = output.slice(contentStart, i - 1).trim();
+  }
 
   return { themeCss, utilityCss };
 }
 
 // --- Unmatched detection [ENG-01] ---
+
+/**
+ * Unescape a CSS selector identifier back to its original class name.
+ * Handles:
+ * - `\\:` → `:` (escaped colons for variants like hover\:bg-blue)
+ * - `\\/` → `/` (escaped slashes for fractions like w-1\/2)
+ * - `\\32 xl` → `2xl` (numeric escapes: `\XX ` where XX is hex code point + mandatory space)
+ * - `\\.` → `.` (escaped dots for arbitrary values)
+ * - Generic `\\X` → `X`
+ */
+function unescapeCssSelector(escaped: string): string {
+  return escaped.replace(/\\([0-9a-fA-F]{1,6})\s?|\\(.)/g, (_, hex, ch) => {
+    if (hex) return String.fromCodePoint(parseInt(hex, 16));
+    return ch;
+  });
+}
+
 function detectMatches(
   candidates: string[],
   utilityCss: string,
 ): { matched: Set<string>; unmatched: string[] } {
-  const selectorRe = /^\s*\.([^\s{]+)\s*\{/gm;
+  // Match CSS selectors — capture everything after the leading dot up to the opening brace,
+  // including spaces that are part of numeric escapes (e.g. `.\32 xl\:grid`)
+  const selectorRe = /^\s*\.((?:[^{](?!,\s*\.))*?)\s*(?:,|\{)/gm;
   const generated = new Set<string>();
   let m;
   while ((m = selectorRe.exec(utilityCss)) !== null) {
-    // Unescape CSS backslashes to get original class name
-    generated.add(m[1].replace(/\\/g, ""));
+    generated.add(unescapeCssSelector(m[1].trimEnd()));
   }
 
   const matched = new Set<string>();

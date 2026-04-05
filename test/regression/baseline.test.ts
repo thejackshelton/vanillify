@@ -235,3 +235,27 @@ describe("regression baseline - no classes (edge case)", () => {
     );
   });
 });
+
+describe("regression baseline - theme warning paths", () => {
+  it("captures malformed theme declaration warnings", async () => {
+    const source = `<div className="flex p-4">test</div>`;
+    const result = await convert(source, "test.tsx", {
+      themeCss: "@theme { not-a-declaration; }",
+    });
+
+    await expect(JSON.stringify(result.warnings, null, 2)).toMatchFileSnapshot(
+      resolve(FIXTURES, "theme-parse-error-warnings.json"),
+    );
+  });
+
+  it("captures unsupported theme reset warnings", async () => {
+    const source = `<div className="flex p-4">test</div>`;
+    const result = await convert(source, "test.tsx", {
+      themeCss: "@theme { --color-brand: initial; }",
+    });
+
+    await expect(JSON.stringify(result.warnings, null, 2)).toMatchFileSnapshot(
+      resolve(FIXTURES, "theme-reset-warnings.json"),
+    );
+  });
+});

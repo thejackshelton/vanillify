@@ -153,3 +153,39 @@ describe("edge cases", () => {
     expect(result.matched.size).toBeGreaterThan(0);
   });
 });
+
+describe("Codex review fixes", () => {
+  beforeEach(() => {
+    resetTwGenerator();
+  });
+
+  it("build() cumulative state does not leak matched classes between calls", async () => {
+    // First call generates flex
+    const result1 = await twGenerateCSS(new Set(["flex"]));
+    expect(result1.matched).toContain("flex");
+
+    // Second call with p-4 only — should NOT report flex as matched
+    const result2 = await twGenerateCSS(new Set(["p-4"]));
+    expect(result2.matched).toContain("p-4");
+    expect(result2.matched).not.toContain("flex");
+    expect(result2.unmatched).toEqual([]);
+  });
+
+  it("handles escaped selectors like 2xl: variant", async () => {
+    const result = await twGenerateCSS(new Set(["2xl:grid"]));
+
+    expect(result.matched).toContain("2xl:grid");
+    expect(result.unmatched).toEqual([]);
+  });
+
+  it("utility CSS does not contain @property or @layer properties blocks", async () => {
+    // content-["x"] can trigger @property blocks in Tailwind output
+    const result = await twGenerateCSS(
+      new Set(["flex", "p-4", "before:content-['x']"]),
+    );
+
+    expect(result.css).not.toContain("@property");
+    expect(result.css).not.toContain("@layer properties");
+    expect(result.css).toContain(".flex");
+  });
+});
