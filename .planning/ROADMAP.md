@@ -192,7 +192,11 @@ Plans:
   3. Per-node CSS isolation is correct -- each node's CSS block contains only rules for that node's classes, no cross-contamination
   4. Unmatched Tailwind classes produce warnings via CSS output inspection (replacing the UnoCSS `matched` set approach)
   5. All existing tests pass with updated assertions reflecting Tailwind's CSS output format differences
-**Plans**: TBD
+**Plans:** 2 plans
+
+Plans:
+- [ ] 10-01-PLAN.md -- Rewriter adaptation for Tailwind nested CSS and convert() pipeline simplification
+- [ ] 10-02-PLAN.md -- Update all tests and regression snapshots for Tailwind output format
 
 ### Phase 11: Cleanup and API Verification
 **Goal**: The codebase contains no UnoCSS code or dependencies, all Tailwind imports are isolated to one adapter file, and the public API is fully backward compatible
@@ -222,5 +226,5 @@ Phases execute in numeric order: 8 -> 9 -> 10 -> 11
 | 7. CSS Modules Output | v1.1 | 2/2 | Complete | 2026-04-05 |
 | 8. Regression Test Baseline | v2.0 | 1/1 | Complete | - |
 | 9. Tailwind Adapter Module | v2.0 | 0/1 | Not started | - |
-| 10. Pipeline Wiring and Rewriter Adaptation | v2.0 | 0/0 | Not started | - |
+| 10. Pipeline Wiring and Rewriter Adaptation | v2.0 | 0/2 | Not started | - |
 | 11. Cleanup and API Verification | v2.0 | 0/0 | Not started | - |
