@@ -1,3 +1,4 @@
+import type { VariantObject } from '@unocss/core'
 import type { NodeEntry, Warning } from '../types'
 import type { NameMap } from './namer'
 import { generateCSS } from './generator'
@@ -32,7 +33,8 @@ export async function rewrite(
   source: string,
   entries: NodeEntry[],
   nameMap: NameMap,
-  extractWarnings: Warning[]
+  extractWarnings: Warning[],
+  customVariants?: VariantObject[],
 ): Promise<RewriteResult> {
   const allWarnings: Warning[] = [...extractWarnings]
   const cssBlocks: string[] = []
@@ -44,7 +46,7 @@ export async function rewrite(
     if (!name) continue
 
     const tokens = new Set(entry.classNames)
-    const result = await generateCSS(tokens)
+    const result = await generateCSS(tokens, customVariants)
 
     // Collect unmatched warnings
     allWarnings.push(...result.warnings)
@@ -222,34 +224,40 @@ function matchesAnyPattern(line: string, patterns: string[]): boolean {
 }
 
 /**
- * Extract pseudo-class suffix from a CSS selector line.
+ * Extract selector suffix from a CSS selector line.
+ * Handles both pseudo-class suffixes and attribute selector suffixes.
+ *
  * E.g., ".hover\:bg-blue-700:hover {" -> ":hover"
- * Returns null if no pseudo-class found.
+ * E.g., ".ui-checked\:bg-green-500[ui-checked] {" -> "[ui-checked]"
+ * Returns null if no suffix found.
  *
  * UnoCSS escapes colons in class names with backslash (\:).
  * Real pseudo-classes have a bare colon (not preceded by backslash).
- * We scan the selector portion (before {) for unescaped colons.
+ * Attribute selectors start with [ not preceded by backslash.
+ * We scan the selector portion (before {) for the first unescaped suffix.
  */
 function extractPseudo(line: string): string | null {
   // Get the selector part (before the opening brace)
   const braceIdx = line.indexOf('{')
   const selectorPart = braceIdx > -1 ? line.slice(0, braceIdx).trim() : line.trim()
 
-  // Find all unescaped colons: a colon NOT preceded by a backslash
-  // Walk character by character to find the first unescaped colon
-  let pseudoStart = -1
+  // Find the first unescaped colon or unescaped opening bracket
+  // Walk character by character
+  let suffixStart = -1
   for (let i = 1; i < selectorPart.length; i++) {
-    if (selectorPart[i] === ':' && selectorPart[i - 1] !== '\\') {
-      pseudoStart = i
+    const ch = selectorPart[i]
+    const prev = selectorPart[i - 1]
+    if ((ch === ':' || ch === '[') && prev !== '\\') {
+      suffixStart = i
       break
     }
   }
 
-  if (pseudoStart === -1) return null
+  if (suffixStart === -1) return null
 
-  // Everything from the first unescaped colon to end of selector is the pseudo
-  const pseudo = selectorPart.slice(pseudoStart)
-  return pseudo || null
+  // Everything from the first unescaped suffix character to end of selector
+  const suffix = selectorPart.slice(suffixStart)
+  return suffix || null
 }
 
 /**

@@ -2,6 +2,7 @@ import { parse } from './pipeline/parser'
 import { extract } from './pipeline/extractor'
 import { assignNames } from './pipeline/namer'
 import { rewrite } from './pipeline/rewriter'
+import { resolveCustomVariants } from './variants/resolver'
 import type { ConvertOptions, ConvertResult } from './types'
 
 /**
@@ -23,7 +24,7 @@ import type { ConvertOptions, ConvertResult } from './types'
 export async function convert(
   source: string,
   filename: string,
-  _options?: ConvertOptions
+  options?: ConvertOptions,
 ): Promise<ConvertResult> {
   // 1. Parse source to AST
   const { program } = parse(filename, source)
@@ -34,8 +35,13 @@ export async function convert(
   // 3. Assign indexed class names
   const nameMap = assignNames(entries)
 
-  // 4. Rewrite source and generate per-node CSS
-  const result = await rewrite(source, entries, nameMap, extractWarnings)
+  // 4. Resolve custom variants if provided
+  const variantObjects = options?.customVariants
+    ? resolveCustomVariants(options.customVariants)
+    : undefined
+
+  // 5. Rewrite source and generate per-node CSS
+  const result = await rewrite(source, entries, nameMap, extractWarnings, variantObjects)
 
   return result
 }

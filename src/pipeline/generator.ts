@@ -1,20 +1,33 @@
 import { createGenerator } from '@unocss/core'
+import type { VariantObject } from '@unocss/core'
 import presetWind4 from '@unocss/preset-wind4'
 import type { Warning } from '../types'
 
-// Singleton generator instance -- createGenerator is async and expensive
-let _generator: Awaited<ReturnType<typeof createGenerator>> | null = null
+// Generator cache keyed by sorted variant names -- prevents unbounded growth (T-02-04)
+const _cache = new Map<string, Awaited<ReturnType<typeof createGenerator>>>()
 
 /**
- * Get or create the singleton UnoCSS generator with preset-wind4.
+ * Get or create a UnoCSS generator with preset-wind4 and optional custom variants.
+ * Generators are cached by variant config identity (sorted variant names).
+ *
+ * @param customVariants - Optional array of UnoCSS VariantObject entries
  */
-export async function getGenerator(): Promise<Awaited<ReturnType<typeof createGenerator>>> {
-  if (!_generator) {
-    _generator = await createGenerator({
+export async function getGenerator(
+  customVariants?: VariantObject[],
+): Promise<Awaited<ReturnType<typeof createGenerator>>> {
+  const key = customVariants?.length
+    ? customVariants.map(v => v.name ?? '').sort().join(',')
+    : '__default__'
+
+  let gen = _cache.get(key)
+  if (!gen) {
+    gen = await createGenerator({
       presets: [presetWind4()],
+      ...(customVariants?.length ? { variants: customVariants } : {}),
     })
+    _cache.set(key, gen)
   }
-  return _generator
+  return gen
 }
 
 export interface GenerateCSSResult {
@@ -44,8 +57,8 @@ function stripLayerWrappers(css: string): string {
  * @param tokens - Set of Tailwind class tokens to generate CSS for
  * @returns GenerateCSSResult with CSS string and match info
  */
-export async function generateCSS(tokens: Set<string>): Promise<GenerateCSSResult> {
-  const generator = await getGenerator()
+export async function generateCSS(tokens: Set<string>, customVariants?: VariantObject[]): Promise<GenerateCSSResult> {
+  const generator = await getGenerator(customVariants)
   const result = await generator.generate(tokens)
 
   // Try to get CSS without @layer wrapper; fall back to full CSS and strip manually
@@ -77,5 +90,5 @@ export async function generateCSS(tokens: Set<string>): Promise<GenerateCSSResul
  * Reset the singleton generator (for testing only).
  */
 export function resetGenerator(): void {
-  _generator = null
+  _cache.clear()
 }

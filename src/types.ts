@@ -1,5 +1,28 @@
+import type { CustomVariantsOption } from './variants/types'
+
 export interface ConvertOptions {
-  // Phase 2 will add customVariants here
+  /**
+   * Custom variant definitions for opt-in variant resolution.
+   *
+   * Accepts either:
+   * - A CSS string containing @custom-variant directives
+   * - A Record mapping variant names to selector templates (& = target element)
+   *
+   * @example
+   * // CSS string form:
+   * customVariants: `
+   *   @custom-variant ui-checked (&[ui-checked]);
+   *   @custom-variant ui-disabled (&[ui-disabled]);
+   * `
+   *
+   * @example
+   * // Object form:
+   * customVariants: {
+   *   'ui-checked': '&[ui-checked]',
+   *   'ui-disabled': '&[ui-disabled]',
+   * }
+   */
+  customVariants?: CustomVariantsOption
 }
 
 export interface ConvertResult {
