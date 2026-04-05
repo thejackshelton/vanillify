@@ -22,29 +22,47 @@ const LAYER_RE = createRegExp(
   [global],
 );
 
-// Generator cache keyed by sorted variant names -- prevents unbounded growth (T-02-04)
+// Generator cache keyed by sorted variant names + theme identity -- prevents unbounded growth (T-02-04, T-06-06)
 const _cache = new Map<string, Awaited<ReturnType<typeof createGenerator>>>();
 
 /**
- * Get or create a UnoCSS generator with preset-wind4 and optional custom variants.
- * Generators are cached by variant config identity (sorted variant names).
+ * Simple djb2 hash for cache key differentiation.
+ * O(n) string hash -- no crypto overhead (T-06-06).
+ */
+function simpleHash(str: string): string {
+  let hash = 5381;
+  for (let i = 0; i < str.length; i++) {
+    hash = ((hash << 5) + hash + str.charCodeAt(i)) | 0;
+  }
+  return (hash >>> 0).toString(36);
+}
+
+/**
+ * Get or create a UnoCSS generator with preset-wind4 and optional custom variants/theme.
+ * Generators are cached by variant config identity (sorted variant names) + theme hash.
  *
  * @param customVariants - Optional array of UnoCSS VariantObject entries
+ * @param themeConfig - Optional UnoCSS theme config object (deep-merged with preset defaults)
  */
 export async function getGenerator(
   customVariants?: VariantObject[],
+  themeConfig?: Record<string, any>,
 ): Promise<Awaited<ReturnType<typeof createGenerator>>> {
-  const key = customVariants?.length
+  const variantKey = customVariants?.length
     ? customVariants
         .map((v) => `${v.name ?? ""}:${String(v.match)}`)
         .sort()
         .join(",")
     : "__default__";
 
+  const themeKey = themeConfig ? simpleHash(JSON.stringify(themeConfig)) : "";
+  const key = `${variantKey}|${themeKey}`;
+
   let gen = _cache.get(key);
   if (!gen) {
     gen = await createGenerator({
       presets: [presetWind4()],
+      ...(themeConfig ? { theme: themeConfig } : {}),
       ...(customVariants?.length ? { variants: customVariants } : {}),
     });
     _cache.set(key, gen);
@@ -55,6 +73,8 @@ export async function getGenerator(
 export interface GenerateCSSResult {
   /** Raw CSS for all matched tokens (without @layer wrappers) */
   css: string;
+  /** :root CSS variable definitions from theme layer (empty string if no theme) */
+  themeCss: string;
   /** Tokens that successfully generated CSS */
   matched: Set<string>;
   /** Tokens that produced no CSS (coverage gaps) */
@@ -91,21 +111,42 @@ function stripLayerWrappers(css: string): string {
 }
 
 /**
+ * Extract the theme layer CSS from UnoCSS output.
+ * UnoCSS emits a `/* layer: theme *​/` section containing :root variable definitions.
+ * Returns the content of that section, or empty string if not present.
+ */
+function extractThemeLayer(css: string): string {
+  const themeMarker = "/* layer: theme */";
+  const idx = css.indexOf(themeMarker);
+  if (idx === -1) return "";
+  // Find the next layer marker or end of string
+  const nextLayerIdx = css.indexOf("/* layer:", idx + themeMarker.length);
+  const end = nextLayerIdx > -1 ? nextLayerIdx : css.length;
+  return css.slice(idx + themeMarker.length, end).trim();
+}
+
+/**
  * Generate CSS from a set of Tailwind class tokens using UnoCSS.
- * Returns raw CSS (no @layer wrappers), matched/unmatched info, and warnings.
+ * Returns raw CSS (no @layer wrappers), matched/unmatched info, theme CSS, and warnings.
  *
  * @param tokens - Set of Tailwind class tokens to generate CSS for
- * @returns GenerateCSSResult with CSS string and match info
+ * @param customVariants - Optional custom variant objects
+ * @param themeConfig - Optional UnoCSS theme config (deep-merged with preset defaults)
+ * @returns GenerateCSSResult with CSS string, theme CSS, and match info
  */
 export async function generateCSS(
   tokens: Set<string>,
   customVariants?: VariantObject[],
+  themeConfig?: Record<string, any>,
 ): Promise<GenerateCSSResult> {
-  const generator = await getGenerator(customVariants);
+  const generator = await getGenerator(customVariants, themeConfig);
   const result = await generator.generate(tokens);
 
   // Try to get CSS without @layer wrapper; fall back to full CSS and strip manually
   let css = result.css;
+
+  // Extract theme layer CSS before stripping layers (THEME-06)
+  const themeCss = extractThemeLayer(css);
 
   // Strip @layer wrappers if present
   const hasLayers = css.includes("@layer");
@@ -123,6 +164,7 @@ export async function generateCSS(
 
   return {
     css,
+    themeCss,
     matched: result.matched,
     unmatched,
     warnings,

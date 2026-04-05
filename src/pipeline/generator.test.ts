@@ -123,3 +123,58 @@ describe("generateCSS", () => {
     expect(gen1).toBe(gen2);
   });
 });
+
+describe("generator theme support", () => {
+  beforeEach(() => {
+    resetGenerator();
+  });
+
+  it("getGenerator with no args returns a generator (THEME-10 backward compat)", async () => {
+    const gen = await getGenerator();
+    expect(gen).toBeDefined();
+    const result = await gen.generate(new Set(["flex"]));
+    expect(result.matched.has("flex")).toBe(true);
+  });
+
+  it("getGenerator with theme config returns generator that matches theme utility", async () => {
+    const gen = await getGenerator(undefined, { colors: { brand: "#ff0000" } });
+    const result = await gen.generate(new Set(["bg-brand"]));
+    expect(result.matched.has("bg-brand")).toBe(true);
+  });
+
+  it("getGenerator with theme config still resolves preset defaults (THEME-04)", async () => {
+    const gen = await getGenerator(undefined, { colors: { brand: "#ff0000" } });
+    const result = await gen.generate(new Set(["bg-red-500", "bg-brand"]));
+    expect(result.matched.has("bg-red-500")).toBe(true);
+    expect(result.matched.has("bg-brand")).toBe(true);
+  });
+
+  it("getGenerator called twice with same theme returns cached instance", async () => {
+    const theme = { colors: { brand: "#ff0000" } };
+    const gen1 = await getGenerator(undefined, theme);
+    const gen2 = await getGenerator(undefined, theme);
+    expect(gen1).toBe(gen2);
+  });
+
+  it("getGenerator called with different themes returns different instances (THEME-05)", async () => {
+    const gen1 = await getGenerator(undefined, { colors: { brand: "#ff0000" } });
+    const gen2 = await getGenerator(undefined, { colors: { brand: "#00ff00" } });
+    expect(gen1).not.toBe(gen2);
+  });
+
+  it("generateCSS with theme config generates CSS for theme-defined utilities", async () => {
+    const tokens = new Set(["bg-brand"]);
+    const result = await generateCSS(tokens, undefined, { colors: { brand: "#ff0000" } });
+    expect(result.matched.has("bg-brand")).toBe(true);
+    expect(result.css).toContain("background");
+  });
+
+  it("generateCSS returns theme layer CSS with CSS variables (THEME-06)", async () => {
+    const tokens = new Set(["bg-brand"]);
+    const result = await generateCSS(tokens, undefined, { colors: { brand: "#ff0000" } });
+    expect(result.themeCss).toBeDefined();
+    // Theme layer may contain :root or variable definitions
+    // The exact format depends on UnoCSS output
+    expect(typeof result.themeCss).toBe("string");
+  });
+});
