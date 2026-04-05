@@ -1,25 +1,56 @@
 import type { VariantObject } from '@unocss/core'
 import type { CustomVariantsOption } from './types'
+import { parseCustomVariantCSS } from './parser'
 
 /**
  * Create a UnoCSS VariantObject from a variant name and selector template.
- * Stub -- implementation pending (TDD RED phase).
+ *
+ * The VariantObject's `match` function checks if a token starts with the
+ * variant prefix (e.g., `ui-checked:`). If it does, it strips the prefix
+ * and provides a selector transformation function that replaces `&` in the
+ * template with the actual CSS selector.
+ *
+ * @param name - Variant name (e.g., 'ui-checked')
+ * @param selectorTemplate - CSS selector with & placeholder (e.g., '&[ui-checked]')
  */
 export function createVariantObject(
-  _name: string,
-  _selectorTemplate: string,
+  name: string,
+  selectorTemplate: string,
 ): VariantObject {
+  const prefix = `${name}:`
   return {
-    match: (matcher: string) => matcher,
+    name,
+    match(matcher: string) {
+      if (!matcher.startsWith(prefix)) {
+        return matcher
+      }
+      return {
+        matcher: matcher.slice(prefix.length),
+        selector: (s: string) => selectorTemplate.replace(/&/g, s),
+      }
+    },
   }
 }
 
 /**
  * Resolve customVariants option to UnoCSS VariantObject array.
- * Stub -- implementation pending (TDD RED phase).
+ *
+ * Accepts either:
+ * - A CSS string containing @custom-variant directives (parsed automatically)
+ * - A Record<string, string> mapping variant names to selector templates
+ *
+ * @param input - CSS string or Record of variant definitions
+ * @returns Array of UnoCSS VariantObject entries for createGenerator config
  */
 export function resolveCustomVariants(
-  _input: CustomVariantsOption,
+  input: CustomVariantsOption,
 ): VariantObject[] {
-  return []
+  if (typeof input === 'string') {
+    const parsed = parseCustomVariantCSS(input)
+    return parsed.map(v => createVariantObject(v.name, v.selectorTemplate))
+  }
+
+  return Object.entries(input).map(
+    ([name, selectorTemplate]) => createVariantObject(name, selectorTemplate),
+  )
 }
