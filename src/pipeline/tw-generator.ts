@@ -178,11 +178,11 @@ export async function twGenerateCSS(
 
   // Fresh compile() per call to avoid cumulative build() state leaking
   // across calls with different candidate sets. compile() is ~4ms which
-  // is acceptable for a build-time tool. [ENG-04: cache by full input]
+  // is acceptable for a build-time tool. [ENG-04: cache by cssInput]
   const candidates = [...tokens];
-  const cacheKey = cssInput + "\0" + candidates.sort().join(",");
-  let result = _cache.get(cacheKey);
-  if (result) return result;
+  const cacheKey = cssInput + "\0" + JSON.stringify([...tokens].sort());
+  const cached = _cache.get(cacheKey);
+  if (cached) return cached;
 
   const compiler = await compile(cssInput, { loadStylesheet });
   const output = compiler.build(candidates);
@@ -199,14 +199,22 @@ export async function twGenerateCSS(
     location: { line: 0, column: 0 },
   }));
 
-  result = Object.freeze({
+  const result: TwGenerateCSSResult = {
     css: utilityCss,
     themeCss: extractedTheme,
     matched,
-    unmatched: Object.freeze(unmatched),
-    warnings: Object.freeze(warnings),
+    unmatched,
+    warnings,
+  };
+  // Cache a defensive copy to prevent mutation poisoning.
+  // Freeze strings (css, themeCss) are immutable. Clone mutable containers.
+  _cache.set(cacheKey, {
+    css: utilityCss,
+    themeCss: extractedTheme,
+    matched: new Set(matched),
+    unmatched: [...unmatched],
+    warnings: warnings.map((w) => ({ ...w, location: { ...w.location } })),
   });
-  _cache.set(cacheKey, result);
   return result;
 }
 
