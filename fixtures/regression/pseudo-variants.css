@@ -1,32 +1,30 @@
 .node0 {
-  background-color:color-mix(in srgb, var(--colors-blue-500) var(--un-bg-opacity), transparent);
+  background-color: var(--color-blue-500);
 }
 
-.node0:focus {
-  --un-outline-style:none;
-  outline-style:none;
-}
-
-.node0:hover {
-  background-color:color-mix(in srgb, var(--colors-blue-700) var(--un-bg-opacity), transparent);
-}
-
-.node0:active {
-  background-color:color-mix(in srgb, var(--colors-blue-800) var(--un-bg-opacity), transparent);
-}
-
-.node0:disabled {
-  opacity:50%;
-}
-
-@supports (color: color-mix(in lab, red, red)){
-.node0:hover {
-  background-color:color-mix(in oklab, var(--colors-blue-700) var(--un-bg-opacity), transparent);
-}
-.node0:active {
-  background-color:color-mix(in oklab, var(--colors-blue-800) var(--un-bg-opacity), transparent);
-}
 .node0 {
-  background-color:color-mix(in oklab, var(--colors-blue-500) var(--un-bg-opacity), transparent);
+  &:hover {
+    @media (hover: hover) {
+      background-color: var(--color-blue-700);
+    }
+  }
 }
+
+.node0 {
+  &:focus {
+    --tw-outline-style: none;
+    outline-style: none;
+  }
+}
+
+.node0 {
+  &:active {
+    background-color: var(--color-blue-800);
+  }
+}
+
+.node0 {
+  &:disabled {
+    opacity: 50%;
+  }
 }

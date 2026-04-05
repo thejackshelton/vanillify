@@ -1,4 +1,4 @@
-import { describe, it, expect } from "vite-plus/test";
+import { describe, it, expect } from "vitest";
 import { assignNames, selectorFor } from "./namer";
 import type { NodeEntry } from "../types";
 

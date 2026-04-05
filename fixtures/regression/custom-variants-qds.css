@@ -1,20 +1,17 @@
-.node0[ui-checked] {
-  background-color:color-mix(in srgb, var(--colors-blue-500) var(--un-bg-opacity), transparent);
+.node0 {
+  &[ui-checked] {
+    background-color: var(--color-blue-500);
+  }
 }
 
-.node0[ui-mixed] {
-  background-color:color-mix(in srgb, var(--colors-purple-500) var(--un-bg-opacity), transparent);
+.node0 {
+  &[ui-disabled] {
+    opacity: 50%;
+  }
 }
 
-.node0[ui-disabled] {
-  opacity:50%;
-}
-
-@supports (color: color-mix(in lab, red, red)){
-.node0[ui-checked] {
-  background-color:color-mix(in oklab, var(--colors-blue-500) var(--un-bg-opacity), transparent);
-}
-.node0[ui-mixed] {
-  background-color:color-mix(in oklab, var(--colors-purple-500) var(--un-bg-opacity), transparent);
-}
+.node0 {
+  &[ui-mixed] {
+    background-color: var(--color-purple-500);
+  }
 }

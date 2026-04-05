@@ -175,7 +175,37 @@ export async function twGenerateCSS(
     };
   }
 
-  const compiler = await compile(cssInput, { loadStylesheet });
+  let compiler;
+  try {
+    compiler = await compile(cssInput, { loadStylesheet });
+  } catch (err: unknown) {
+    // Malformed @theme CSS (e.g. invalid declarations) causes CssSyntaxError.
+    // Gracefully degrade: return empty CSS with a theme-parse-error warning.
+    const msg = err instanceof Error ? err.message : String(err);
+    const warnings: Warning[] = [{
+      type: "theme-parse-error" as const,
+      message: `Tailwind CSS compilation error: ${msg}`,
+      location: { line: 0, column: 0 },
+    }];
+    // Still try to generate without theme by compiling base CSS only
+    const fallbackInput = '@import "tailwindcss" source(none);';
+    const fallbackCompiler = await compile(fallbackInput, { loadStylesheet });
+    const fallbackOutput = fallbackCompiler.build(candidates);
+    const { themeCss: fallbackTheme, utilityCss: fallbackUtility } = extractLayers(fallbackOutput);
+    const { unmatched: fallbackUnmatched } = detectMatches(candidates, fallbackUtility);
+    warnings.push(...fallbackUnmatched.map((token) => ({
+      type: "unmatched-class" as const,
+      message: `Unmatched Tailwind class: "${token}" -- no CSS generated`,
+      location: { line: 0, column: 0 },
+    })));
+    return {
+      css: fallbackUtility,
+      themeCss: fallbackTheme,
+      matched: new Set(candidates.filter((c) => !fallbackUnmatched.includes(c))),
+      unmatched: fallbackUnmatched,
+      warnings,
+    };
+  }
   const output = compiler.build(candidates);
 
   // Extract layers [ENG-05]

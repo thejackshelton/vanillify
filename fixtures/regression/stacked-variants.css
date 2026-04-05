@@ -1,16 +1,15 @@
 .node0 {
-  color:color-mix(in srgb, var(--colors-white) var(--un-text-opacity), transparent);
+  @media (prefers-color-scheme: dark) {
+    color: var(--color-white);
+  }
 }
 
-.node0:hover {
-  background-color:color-mix(in srgb, var(--colors-gray-800) var(--un-bg-opacity), transparent);
-}
-
-@supports (color: color-mix(in lab, red, red)){
-.node0:hover {
-  background-color:color-mix(in oklab, var(--colors-gray-800) var(--un-bg-opacity), transparent);
-}
 .node0 {
-  color:color-mix(in oklab, var(--colors-white) var(--un-text-opacity), transparent);
-}
+  @media (prefers-color-scheme: dark) {
+    &:hover {
+      @media (hover: hover) {
+        background-color: var(--color-gray-800);
+      }
+    }
+  }
 }
