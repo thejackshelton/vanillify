@@ -61,7 +61,12 @@ Plans:
   2. CLI delegates all conversion logic to the programmatic API — no conversion code lives in `src/cli.ts`
   3. `import { convert } from 'vanillify'` works in both ESM and CJS environments with full TypeScript types
   4. Vitest fixture tests (Qwik checkbox example) pass and snapshot output is stable
-**Plans**: TBD
+**Plans:** 2 plans
+
+Plans:
+- [ ] 03-01-PLAN.md — CLI entry point, dependencies, tsdown dual-entry build
+- [ ] 03-02-PLAN.md — Fixture-based snapshot tests with toMatchFileSnapshot
+
 **UI hint**: no
 
 ## Progress
@@ -73,4 +78,4 @@ Phases execute in numeric order: 1 → 2 → 3
 |-------|----------------|--------|-----------|
 | 1. Core Pipeline | 4/4 | Complete    | 2026-04-05 |
 | 2. Custom Variant Resolution | 2/2 | Complete    | 2026-04-05 |
-| 3. CLI and Package | 0/TBD | Not started | - |
+| 3. CLI and Package | 0/2 | Planning complete | - |
