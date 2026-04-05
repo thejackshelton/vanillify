@@ -55,16 +55,17 @@ export async function convert(
   }
 
   // 6. Rewrite source and generate per-node CSS
-  const result = await rewrite(source, entries, nameMap, extractWarnings, variantObjects, themeConfig);
+  const result = await rewrite(source, entries, nameMap, extractWarnings, variantObjects, themeConfig, options?.outputFormat, filename);
 
   return {
     component: result.component,
     css: result.css,
     themeCss: options?.themeCss ? (result.themeCss ?? "") : "",
     warnings: [...themeWarnings, ...result.warnings],
+    ...(result.classMap ? { classMap: result.classMap } : {}),
   };
 }
 
 export { parseThemeCss } from "./theme/parser";
 export { mapToThemeConfig } from "./theme/mapper";
-export type { ConvertOptions, ConvertResult, Warning, NodeEntry } from "./types";
+export type { ConvertOptions, ConvertResult, OutputFormat, Warning, NodeEntry } from "./types";

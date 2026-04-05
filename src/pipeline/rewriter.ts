@@ -1,6 +1,6 @@
 import { charIn, createRegExp, global } from "magic-regexp";
 import type { VariantObject } from "@unocss/core";
-import type { NodeEntry, Warning } from "../types";
+import type { NodeEntry, OutputFormat, Warning } from "../types";
 import type { NameMap } from "./namer";
 import { generateCSS } from "./generator";
 
@@ -19,6 +19,8 @@ export interface RewriteResult {
   themeCss: string;
   /** All warnings (from extraction + generation) */
   warnings: Warning[];
+  /** CSS Modules class map (only present when outputFormat is 'css-modules') */
+  classMap?: Record<string, string>;
 }
 
 /**
@@ -45,6 +47,8 @@ export async function rewrite(
   extractWarnings: Warning[],
   customVariants?: VariantObject[],
   themeConfig?: Record<string, any>,
+  outputFormat?: OutputFormat,
+  filename?: string,
 ): Promise<RewriteResult> {
   const allWarnings: Warning[] = [...extractWarnings];
   const cssBlocks: string[] = [];
@@ -77,12 +81,16 @@ export async function rewrite(
 
   // Rewrite source -- replace className values with indexed names
   // Sort replacements in reverse order to avoid offset drift
+  const isCSSModules = outputFormat === 'css-modules';
   const replacements = entries
     .filter((e) => !e.isDynamic && nameMap.has(e.nodeIndex))
-    .map((e) => ({
-      span: e.span,
-      newValue: `"${nameMap.get(e.nodeIndex)}"`,
-    }))
+    .map((e) => {
+      const name = nameMap.get(e.nodeIndex)!;
+      return {
+        span: e.span,
+        newValue: isCSSModules ? `{styles.${name}}` : `"${name}"`,
+      };
+    })
     .sort((a, b) => b.span.start - a.span.start);
 
   let component = source;
@@ -90,9 +98,47 @@ export async function rewrite(
     component = component.slice(0, span.start) + newValue + component.slice(span.end);
   }
 
+  // Insert CSS Modules import statement
+  if (isCSSModules && filename) {
+    component = prependModuleImport(component, filename);
+  }
+
+  // Build classMap for CSS Modules
+  let classMap: Record<string, string> | undefined;
+  if (isCSSModules) {
+    classMap = {};
+    for (const [, name] of nameMap) {
+      classMap[name] = name;
+    }
+  }
+
   const css = cssBlocks.join("\n\n");
 
-  return { component, css, themeCss, warnings: allWarnings };
+  return { component, css, themeCss, warnings: allWarnings, classMap };
+}
+
+/**
+ * Insert `import styles from './filename.module.css'` into the component source.
+ * Placed after the last existing import statement, or at the top if none exist.
+ */
+function prependModuleImport(source: string, filename: string): string {
+  const baseName = filename.replace(/\.(tsx?|jsx?)$/, '');
+  const importPath = './' + baseName + '.module.css';
+  const importLine = `import styles from '${importPath}';`;
+
+  const lines = source.split('\n');
+  let lastImportIdx = -1;
+  for (let i = 0; i < lines.length; i++) {
+    if (lines[i].trimStart().startsWith('import ')) {
+      lastImportIdx = i;
+    }
+  }
+  if (lastImportIdx >= 0) {
+    lines.splice(lastImportIdx + 1, 0, importLine);
+  } else {
+    lines.unshift(importLine);
+  }
+  return lines.join('\n');
 }
 
 /**

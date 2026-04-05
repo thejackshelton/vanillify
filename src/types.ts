@@ -1,5 +1,8 @@
 import type { CustomVariantsOption } from "./variants/types";
 
+/** Output format for converted CSS and component references. */
+export type OutputFormat = 'vanilla' | 'css-modules';
+
 export interface ConvertOptions {
   /**
    * Custom variant definitions for opt-in variant resolution.
@@ -38,6 +41,9 @@ export interface ConvertOptions {
    * }`
    */
   themeCss?: string;
+
+  /** Output format. 'vanilla' (default) produces bare class names, 'css-modules' produces styles.nodeN expressions with import statement. */
+  outputFormat?: OutputFormat;
 }
 
 export interface ConvertResult {
@@ -49,6 +55,8 @@ export interface ConvertResult {
   themeCss: string;
   /** Warnings for dynamic/unmatched classes */
   warnings: Warning[];
+  /** CSS Modules class map (only present when outputFormat is 'css-modules'). Maps indexed names to themselves, e.g. { node0: "node0" }. */
+  classMap?: Record<string, string>;
 }
 
 export interface Warning {

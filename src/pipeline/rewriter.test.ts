@@ -3,8 +3,9 @@ import { rewrite } from "./rewriter";
 import { parse } from "./parser";
 import { extract } from "./extractor";
 import { assignNames } from "./namer";
+import { convert } from "../index";
 import { createVariantObject } from "../variants/resolver";
-import type { Warning } from "../types";
+import type { OutputFormat, Warning } from "../types";
 import type { VariantObject } from "@unocss/core";
 
 /**
@@ -15,11 +16,13 @@ async function rewriteFromSource(
   source: string,
   filename = "test.tsx",
   customVariants?: VariantObject[],
+  themeConfig?: Record<string, any>,
+  outputFormat?: OutputFormat,
 ) {
   const { program } = parse(filename, source);
   const { entries, warnings } = extract(program, source);
   const nameMap = assignNames(entries);
-  return rewrite(source, entries, nameMap, warnings, customVariants);
+  return rewrite(source, entries, nameMap, warnings, customVariants, themeConfig, outputFormat, filename);
 }
 
 describe("rewrite", () => {
@@ -225,5 +228,85 @@ describe("convert() theme integration", () => {
 
     const parseWarnings = result.warnings.filter((w) => w.type === "theme-parse-error");
     expect(parseWarnings.length).toBeGreaterThanOrEqual(1);
+  });
+});
+
+describe("rewrite with css-modules format", () => {
+  it("produces {styles.node0} instead of string literal", async () => {
+    const source = '<div className="flex p-4">hi</div>';
+    const result = await rewriteFromSource(source, "test.tsx", undefined, undefined, "css-modules");
+
+    expect(result.component).toContain("{styles.node0}");
+    expect(result.component).not.toContain('"node0"');
+  });
+
+  it("prepends import styles from './test.module.css'", async () => {
+    const source = '<div className="flex p-4">hi</div>';
+    const result = await rewriteFromSource(source, "test.tsx", undefined, undefined, "css-modules");
+
+    expect(result.component).toContain("import styles from './test.module.css'");
+  });
+
+  it("inserts import AFTER existing imports", async () => {
+    const source = `import { component$ } from "@qwik.dev/core";\n\nexport default component$(() => {\n  return <div className="flex p-4">hi</div>;\n});`;
+    const result = await rewriteFromSource(source, "test.tsx", undefined, undefined, "css-modules");
+
+    const lines = result.component.split("\n");
+    const qwikImportIdx = lines.findIndex((l: string) => l.includes("@qwik.dev/core"));
+    const stylesImportIdx = lines.findIndex((l: string) => l.includes("import styles from"));
+    expect(stylesImportIdx).toBeGreaterThan(qwikImportIdx);
+    expect(stylesImportIdx).toBeLessThan(lines.findIndex((l: string) => l.includes("export")));
+  });
+
+  it("default (no outputFormat) produces same output as vanilla", async () => {
+    const source = '<div className="flex p-4">hi</div>';
+    const result = await rewriteFromSource(source, "test.tsx");
+
+    expect(result.component).toContain('"node0"');
+    expect(result.component).not.toContain("styles.");
+    expect(result.component).not.toContain("import styles");
+  });
+
+  it("CSS content is identical between vanilla and css-modules", async () => {
+    const source = '<div className="flex p-4">hi</div>';
+    const vanilla = await rewriteFromSource(source, "test.tsx");
+    const modules = await rewriteFromSource(source, "test.tsx", undefined, undefined, "css-modules");
+
+    expect(modules.css).toBe(vanilla.css);
+  });
+
+  it("leaves dynamic className expressions unchanged", async () => {
+    const source = '<div className={active ? "bg-blue-500" : "bg-gray-500"}>hi</div>';
+    const result = await rewriteFromSource(source, "test.tsx", undefined, undefined, "css-modules");
+
+    expect(result.component).toContain('active ? "bg-blue-500" : "bg-gray-500"');
+  });
+
+  it("returns classMap in result", async () => {
+    const source = '<div className="flex p-4">hi</div>';
+    const result = await rewriteFromSource(source, "test.tsx", undefined, undefined, "css-modules");
+
+    expect(result.classMap).toBeDefined();
+    expect(result.classMap!["node0"]).toBe("node0");
+  });
+});
+
+describe("convert() css-modules integration", () => {
+  it("convert with outputFormat css-modules produces styles.node0", async () => {
+    const source = 'export function App() { return <div className="flex p-4">hi</div>; }';
+    const result = await convert(source, "test.tsx", { outputFormat: "css-modules" });
+
+    expect(result.component).toContain("{styles.node0}");
+    expect(result.component).toContain("import styles from");
+    expect(result.classMap).toBeDefined();
+  });
+
+  it("convert without outputFormat produces identical output to current behavior", async () => {
+    const source = 'export function App() { return <div className="flex p-4">hi</div>; }';
+    const result = await convert(source, "test.tsx");
+
+    expect(result.component).toContain('"node0"');
+    expect(result.component).not.toContain("styles.");
+    expect(result.classMap).toBeUndefined();
   });
 });
