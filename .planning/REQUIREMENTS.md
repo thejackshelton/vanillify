@@ -36,7 +36,7 @@ Requirements for the Tailwind compile() engine migration.
 
 - [x] **REG-01**: Snapshot tests capture current `convert()` output for all existing fixtures before any engine changes
 - [x] **REG-02**: Unmatched Tailwind classes produce `unmatched-class` warnings via CSS output inspection (replacing UnoCSS's `matched` set)
-- [ ] **REG-03**: All existing tests pass after engine swap with updated assertions for Tailwind's CSS output format
+- [x] **REG-03**: All existing tests pass after engine swap with updated assertions for Tailwind's CSS output format
 
 ### Rewriter
 
@@ -105,7 +105,7 @@ Which phases cover which requirements. Updated during roadmap creation.
 | ENG-05 | Phase 9 | Complete |
 | REG-01 | Phase 8 | Complete |
 | REG-02 | Phase 10 | Complete |
-| REG-03 | Phase 10 | Pending |
+| REG-03 | Phase 10 | Complete |
 | RWR-01 | Phase 10 | Complete |
 | RWR-02 | Phase 10 | Complete |
 | RWR-03 | Phase 10 | Complete |
