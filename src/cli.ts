@@ -30,15 +30,10 @@ const main = defineCommand({
       alias: "o",
       description: "Output directory (default: alongside input files)",
     },
-    customVariants: {
+    css: {
       type: "string",
       alias: "c",
-      description: "Path to CSS file with @custom-variant definitions",
-    },
-    theme: {
-      type: "string",
-      alias: "t",
-      description: "Path to CSS file with @theme block definitions",
+      description: "Path to CSS file with @theme, @custom-variant, or other directives",
     },
     format: {
       type: "string",
@@ -59,23 +54,16 @@ const main = defineCommand({
 
     consola.info(`Processing ${files.length} file(s)...`);
 
-    // Read custom variants CSS file if provided
-    let customVariantsCSS: string | undefined;
-    if (args.customVariants) {
-      customVariantsCSS = await readFile(resolve(args.customVariants), "utf-8");
-    }
-
-    // Read theme CSS file if provided
-    let themeCss: string | undefined;
-    if (args.theme) {
-      themeCss = await readFile(resolve(args.theme), "utf-8");
+    // Read CSS file if provided (may contain @theme, @custom-variant, etc.)
+    let cssContent: string | undefined;
+    if (args.css) {
+      cssContent = await readFile(resolve(args.css), "utf-8");
     }
 
     const outputFormat: OutputFormat = args.format === 'css-modules' ? 'css-modules' : 'vanilla';
 
     const options: ConvertOptions = {
-      ...(customVariantsCSS ? { customVariants: customVariantsCSS } : {}),
-      ...(themeCss ? { themeCss } : {}),
+      ...(cssContent ? { css: cssContent } : {}),
       outputFormat,
     };
 

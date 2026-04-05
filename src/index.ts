@@ -2,14 +2,17 @@ import { parse } from "./pipeline/parser";
 import { extract } from "./pipeline/extractor";
 import { assignNames } from "./pipeline/namer";
 import { rewrite } from "./pipeline/rewriter";
-import type { ConvertOptions, ConvertResult } from "./types";
+import { resolveCustomVariants } from "./variants/resolver";
+import { parseThemeCss } from "./theme/parser";
+import { mapToThemeConfig } from "./theme/mapper";
+import type { ConvertOptions, ConvertResult, Warning } from "./types";
 
 /**
  * Convert a JSX/TSX source file from Tailwind classes to vanilla CSS.
  *
  * Accepts source code as a string, extracts Tailwind class names from
  * className/class attributes using AST parsing (not regex), generates
- * vanilla CSS using Tailwind's native compile().build() API, and
+ * vanilla CSS using UnoCSS's createGenerator with preset-wind4, and
  * returns the transformed component with indexed class names (.node0, .node1)
  * plus the generated CSS.
  *
@@ -17,7 +20,7 @@ import type { ConvertOptions, ConvertResult } from "./types";
  *
  * @param source - JSX/TSX source code string
  * @param filename - Filename for parser language detection (e.g., "component.tsx")
- * @param options - Optional configuration (customVariants, themeCss, outputFormat)
+ * @param options - Optional configuration (css, outputFormat)
  * @returns Promise<ConvertResult> with { component, css, warnings }
  */
 export async function convert(
@@ -34,43 +37,35 @@ export async function convert(
   // 3. Assign indexed class names
   const nameMap = assignNames(entries);
 
-  // 4. Convert customVariants to CSS string if Record form
-  let customVariantsCss: string | undefined;
-  if (options?.customVariants) {
-    customVariantsCss = typeof options.customVariants === 'string'
-      ? options.customVariants
-      : variantsRecordToCss(options.customVariants);
+  // 4. Resolve custom variants from css option if it contains @custom-variant directives
+  const variantObjects = options?.css
+    ? resolveCustomVariants(options.css)
+    : undefined;
+
+  // 5. Parse theme CSS if css option contains @theme blocks
+  let themeConfig: Record<string, any> | undefined;
+  const themeWarnings: Warning[] = [];
+
+  if (options?.css) {
+    const parseResult = parseThemeCss(options.css);
+    themeWarnings.push(...parseResult.warnings);
+    const mapResult = mapToThemeConfig(parseResult.declarations);
+    themeWarnings.push(...mapResult.warnings);
+    themeConfig = mapResult.theme;
   }
 
-  // 5. Rewrite source and generate per-node CSS via Tailwind engine
-  // Pass raw CSS strings directly -- Tailwind handles @theme and @custom-variant natively
-  const result = await rewrite(
-    source, entries, nameMap, extractWarnings,
-    customVariantsCss, options?.themeCss,
-    options?.outputFormat, filename,
-  );
+  // 6. Rewrite source and generate per-node CSS
+  const result = await rewrite(source, entries, nameMap, extractWarnings, variantObjects, themeConfig, options?.outputFormat, filename);
 
   return {
     component: result.component,
     css: result.css,
-    themeCss: options?.themeCss ? (result.themeCss ?? "") : "",
-    warnings: result.warnings,
+    themeCss: options?.css ? (result.themeCss ?? "") : "",
+    warnings: [...themeWarnings, ...result.warnings],
     ...(result.classMap ? { classMap: result.classMap } : {}),
   };
 }
 
-/**
- * Convert a Record<string, string> of custom variant definitions to CSS
- * @custom-variant directives that Tailwind understands natively.
- *
- * @example
- * variantsRecordToCss({ 'ui-checked': '&[ui-checked]' })
- * // => '@custom-variant ui-checked (&[ui-checked]);'
- */
-function variantsRecordToCss(record: Record<string, string>): string {
-  return Object.entries(record)
-    .map(([name, tmpl]) => `@custom-variant ${name} (${tmpl});`)
-    .join('\n');
-}
-
-export type { ConvertOptions, ConvertResult, OutputFormat, Warning, NodeEntry, CustomVariantsOption } from "./types";
+export { parseThemeCss } from "./theme/parser";
+export { mapToThemeConfig } from "./theme/mapper";
+export type { ConvertOptions, ConvertResult, OutputFormat, Warning, NodeEntry } from "./types";
