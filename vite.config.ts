@@ -1,14 +1,20 @@
-import { defineConfig } from 'vite-plus'
+import { defineConfig } from "vite-plus";
 
 export default defineConfig({
   pack: {
-    entry: ['./src/index.ts', './src/cli.ts'],
-    format: ['esm', 'cjs'],
+    entry: ["./src/index.ts", "./src/cli.ts"],
+    format: ["esm", "cjs"],
     dts: true,
     clean: true,
   },
   test: {
-    environment: 'node',
-    include: ['src/**/*.test.ts', 'test/**/*.test.ts'],
+    environment: "node",
+    include: ["src/**/*.test.ts", "test/**/*.test.ts"],
   },
-})
+  lint: {
+    ignorePatterns: ["dist/**", "fixtures/**", "node_modules/**"],
+  },
+  fmt: {
+    ignorePatterns: ["dist/**", "fixtures/**", "node_modules/**"],
+  },
+});

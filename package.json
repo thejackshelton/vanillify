@@ -1,8 +1,15 @@
 {
   "name": "vanillify",
   "version": "0.0.1",
-  "type": "module",
   "description": "Tailwind CSS to vanilla CSS converter powered by UnoCSS and oxc-parser",
+  "license": "MIT",
+  "bin": {
+    "vanillify": "./dist/cli.mjs"
+  },
+  "files": [
+    "dist"
+  ],
+  "type": "module",
   "main": "./dist/index.cjs",
   "module": "./dist/index.mjs",
   "types": "./dist/index.d.mts",
@@ -18,13 +25,13 @@
       }
     }
   },
-  "bin": {
-    "vanillify": "./dist/cli.mjs"
-  },
   "scripts": {
     "build": "vp pack",
     "test": "vp test",
     "test:watch": "vp test watch",
+    "lint": "vp lint",
+    "fmt": "vp fmt",
+    "check": "vp check",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
@@ -45,9 +52,5 @@
   "engines": {
     "node": ">=20"
   },
-  "files": [
-    "dist"
-  ],
-  "license": "MIT",
   "packageManager": "pnpm@10.25.0"
 }

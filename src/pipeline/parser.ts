@@ -1,8 +1,8 @@
-import { parseSync } from 'oxc-parser'
+import { parseSync } from "oxc-parser";
 
 export interface ParseResult {
-  program: any // ESTree Program node from oxc-parser
-  errors: Array<{ message: string }>
+  program: any; // ESTree Program node from oxc-parser
+  errors: Array<{ message: string }>;
 }
 
 /**
@@ -17,29 +17,27 @@ export interface ParseResult {
 export function parse(filename: string, source: string): ParseResult {
   try {
     const result = parseSync(filename, source, {
-      sourceType: 'module',
-    })
+      sourceType: "module",
+    });
 
     if (result.errors && result.errors.length > 0) {
       // T-01-02: Only include user-provided filename, not filesystem paths
-      const messages = result.errors
-        .map((e: any) => e.message)
-        .join(', ')
-      throw new Error(`Parse error in ${filename}: ${messages}`)
+      const messages = result.errors.map((e: any) => e.message).join(", ");
+      throw new Error(`Parse error in ${filename}: ${messages}`);
     }
 
     return {
       program: result.program,
       errors: [],
-    }
+    };
   } catch (error) {
     // T-01-01: Never let native parser crash propagate unhandled
-    if (error instanceof Error && error.message.startsWith('Parse error')) {
-      throw error
+    if (error instanceof Error && error.message.startsWith("Parse error")) {
+      throw error;
     }
     // Wrap unexpected errors with filename context only
     throw new Error(
-      `Parse error in ${filename}: ${error instanceof Error ? error.message : 'Unknown parsing error'}`
-    )
+      `Parse error in ${filename}: ${error instanceof Error ? error.message : "Unknown parsing error"}`,
+    );
   }
 }

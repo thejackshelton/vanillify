@@ -1,9 +1,9 @@
-import { parse } from './pipeline/parser'
-import { extract } from './pipeline/extractor'
-import { assignNames } from './pipeline/namer'
-import { rewrite } from './pipeline/rewriter'
-import { resolveCustomVariants } from './variants/resolver'
-import type { ConvertOptions, ConvertResult } from './types'
+import { parse } from "./pipeline/parser";
+import { extract } from "./pipeline/extractor";
+import { assignNames } from "./pipeline/namer";
+import { rewrite } from "./pipeline/rewriter";
+import { resolveCustomVariants } from "./variants/resolver";
+import type { ConvertOptions, ConvertResult } from "./types";
 
 /**
  * Convert a JSX/TSX source file from Tailwind classes to vanilla CSS.
@@ -27,23 +27,23 @@ export async function convert(
   options?: ConvertOptions,
 ): Promise<ConvertResult> {
   // 1. Parse source to AST
-  const { program } = parse(filename, source)
+  const { program } = parse(filename, source);
 
   // 2. Extract class entries from AST
-  const { entries, warnings: extractWarnings } = extract(program, source)
+  const { entries, warnings: extractWarnings } = extract(program, source);
 
   // 3. Assign indexed class names
-  const nameMap = assignNames(entries)
+  const nameMap = assignNames(entries);
 
   // 4. Resolve custom variants if provided
   const variantObjects = options?.customVariants
     ? resolveCustomVariants(options.customVariants)
-    : undefined
+    : undefined;
 
   // 5. Rewrite source and generate per-node CSS
-  const result = await rewrite(source, entries, nameMap, extractWarnings, variantObjects)
+  const result = await rewrite(source, entries, nameMap, extractWarnings, variantObjects);
 
-  return result
+  return result;
 }
 
-export type { ConvertOptions, ConvertResult, Warning, NodeEntry } from './types'
+export type { ConvertOptions, ConvertResult, Warning, NodeEntry } from "./types";

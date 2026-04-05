@@ -1,4 +1,4 @@
-import type { CustomVariantsOption } from './variants/types'
+import type { CustomVariantsOption } from "./variants/types";
 
 export interface ConvertOptions {
   /**
@@ -22,31 +22,31 @@ export interface ConvertOptions {
    *   'ui-disabled': '&[ui-disabled]',
    * }
    */
-  customVariants?: CustomVariantsOption
+  customVariants?: CustomVariantsOption;
 }
 
 export interface ConvertResult {
   /** Transformed component source with indexed class names */
-  component: string
+  component: string;
   /** Generated vanilla CSS */
-  css: string
+  css: string;
   /** Warnings for dynamic/unmatched classes */
-  warnings: Warning[]
+  warnings: Warning[];
 }
 
 export interface Warning {
-  type: 'dynamic-class' | 'unmatched-class'
-  message: string
-  location: { line: number; column: number }
+  type: "dynamic-class" | "unmatched-class";
+  message: string;
+  location: { line: number; column: number };
 }
 
 export interface NodeEntry {
   /** 0-based index in DOM extraction order */
-  nodeIndex: number
+  nodeIndex: number;
   /** Extracted Tailwind class tokens */
-  classNames: string[]
+  classNames: string[];
   /** Byte offset span in original source for the attribute value */
-  span: { start: number; end: number }
+  span: { start: number; end: number };
   /** Whether this className is a dynamic expression */
-  isDynamic: boolean
+  isDynamic: boolean;
 }

@@ -1,6 +1,6 @@
-import type { VariantObject } from '@unocss/core'
-import type { CustomVariantsOption } from './types'
-import { parseCustomVariantCSS } from './parser'
+import type { VariantObject } from "@unocss/core";
+import type { CustomVariantsOption } from "./types";
+import { parseCustomVariantCSS } from "./parser";
 
 /**
  * Create a UnoCSS VariantObject from a variant name and selector template.
@@ -13,23 +13,20 @@ import { parseCustomVariantCSS } from './parser'
  * @param name - Variant name (e.g., 'ui-checked')
  * @param selectorTemplate - CSS selector with & placeholder (e.g., '&[ui-checked]')
  */
-export function createVariantObject(
-  name: string,
-  selectorTemplate: string,
-): VariantObject {
-  const prefix = `${name}:`
+export function createVariantObject(name: string, selectorTemplate: string): VariantObject {
+  const prefix = `${name}:`;
   return {
     name,
     match(matcher: string) {
       if (!matcher.startsWith(prefix)) {
-        return matcher
+        return matcher;
       }
       return {
         matcher: matcher.slice(prefix.length),
         selector: (s: string) => selectorTemplate.replace(/&/g, s),
-      }
+      };
     },
-  }
+  };
 }
 
 /**
@@ -42,15 +39,13 @@ export function createVariantObject(
  * @param input - CSS string or Record of variant definitions
  * @returns Array of UnoCSS VariantObject entries for createGenerator config
  */
-export function resolveCustomVariants(
-  input: CustomVariantsOption,
-): VariantObject[] {
-  if (typeof input === 'string') {
-    const parsed = parseCustomVariantCSS(input)
-    return parsed.map(v => createVariantObject(v.name, v.selectorTemplate))
+export function resolveCustomVariants(input: CustomVariantsOption): VariantObject[] {
+  if (typeof input === "string") {
+    const parsed = parseCustomVariantCSS(input);
+    return parsed.map((v) => createVariantObject(v.name, v.selectorTemplate));
   }
 
-  return Object.entries(input).map(
-    ([name, selectorTemplate]) => createVariantObject(name, selectorTemplate),
-  )
+  return Object.entries(input).map(([name, selectorTemplate]) =>
+    createVariantObject(name, selectorTemplate),
+  );
 }

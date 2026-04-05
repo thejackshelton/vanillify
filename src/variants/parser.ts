@@ -1,10 +1,10 @@
-import type { ParsedVariant } from './types'
+import type { ParsedVariant } from "./types";
 
 /** Maximum input length to prevent regex DoS (T-02-01) */
-const MAX_INPUT_LENGTH = 10000
+const MAX_INPUT_LENGTH = 10000;
 
 /** Regex for @custom-variant shorthand: @custom-variant <name> (<selector>); */
-const SHORTHAND_RE = /@custom-variant\s+([\w-]+)\s+\(([^)]+)\)\s*;/g
+const SHORTHAND_RE = /@custom-variant\s+([\w-]+)\s+\(([^)]+)\)\s*;/g;
 
 /**
  * Parse @custom-variant shorthand directives from a CSS string.
@@ -17,26 +17,26 @@ const SHORTHAND_RE = /@custom-variant\s+([\w-]+)\s+\(([^)]+)\)\s*;/g
  */
 export function parseCustomVariantCSS(css: string): ParsedVariant[] {
   if (!css || css.length > MAX_INPUT_LENGTH) {
-    return []
+    return [];
   }
 
-  const variants: ParsedVariant[] = []
-  let match: RegExpExecArray | null
+  const variants: ParsedVariant[] = [];
+  let match: RegExpExecArray | null;
 
   // Reset regex state for reuse
-  SHORTHAND_RE.lastIndex = 0
+  SHORTHAND_RE.lastIndex = 0;
 
   while ((match = SHORTHAND_RE.exec(css)) !== null) {
-    const name = match[1]
-    const selectorTemplate = match[2].trim()
+    const name = match[1];
+    const selectorTemplate = match[2].trim();
 
     // Validate variant name (T-02-02: no CSS special characters)
     if (!/^[\w-]+$/.test(name)) {
-      continue
+      continue;
     }
 
-    variants.push({ name, selectorTemplate })
+    variants.push({ name, selectorTemplate });
   }
 
-  return variants
+  return variants;
 }

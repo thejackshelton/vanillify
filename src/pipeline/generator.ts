@@ -1,10 +1,10 @@
-import { createGenerator } from '@unocss/core'
-import type { VariantObject } from '@unocss/core'
-import presetWind4 from '@unocss/preset-wind4'
-import type { Warning } from '../types'
+import { createGenerator } from "@unocss/core";
+import type { VariantObject } from "@unocss/core";
+import presetWind4 from "@unocss/preset-wind4";
+import type { Warning } from "../types";
 
 // Generator cache keyed by sorted variant names -- prevents unbounded growth (T-02-04)
-const _cache = new Map<string, Awaited<ReturnType<typeof createGenerator>>>()
+const _cache = new Map<string, Awaited<ReturnType<typeof createGenerator>>>();
 
 /**
  * Get or create a UnoCSS generator with preset-wind4 and optional custom variants.
@@ -16,29 +16,32 @@ export async function getGenerator(
   customVariants?: VariantObject[],
 ): Promise<Awaited<ReturnType<typeof createGenerator>>> {
   const key = customVariants?.length
-    ? customVariants.map(v => `${v.name ?? ''}:${String(v.match)}`).sort().join(',')
-    : '__default__'
+    ? customVariants
+        .map((v) => `${v.name ?? ""}:${String(v.match)}`)
+        .sort()
+        .join(",")
+    : "__default__";
 
-  let gen = _cache.get(key)
+  let gen = _cache.get(key);
   if (!gen) {
     gen = await createGenerator({
       presets: [presetWind4()],
       ...(customVariants?.length ? { variants: customVariants } : {}),
-    })
-    _cache.set(key, gen)
+    });
+    _cache.set(key, gen);
   }
-  return gen
+  return gen;
 }
 
 export interface GenerateCSSResult {
   /** Raw CSS for all matched tokens (without @layer wrappers) */
-  css: string
+  css: string;
   /** Tokens that successfully generated CSS */
-  matched: Set<string>
+  matched: Set<string>;
   /** Tokens that produced no CSS (coverage gaps) */
-  unmatched: string[]
+  unmatched: string[];
   /** Warnings for unmatched tokens */
-  warnings: Warning[]
+  warnings: Warning[];
 }
 
 /**
@@ -46,24 +49,24 @@ export interface GenerateCSSResult {
  */
 function stripLayerWrappers(css: string): string {
   // Match @layer blocks and extract inner content, handling nested braces
-  const result: string[] = []
-  const regex = /@layer\s+[\w-]+\s*\{/g
-  let match: RegExpExecArray | null
+  const result: string[] = [];
+  const regex = /@layer\s+[\w-]+\s*\{/g;
+  let match: RegExpExecArray | null;
 
   while ((match = regex.exec(css)) !== null) {
-    let depth = 1
-    let i = match.index + match[0].length
-    const start = i
+    let depth = 1;
+    let i = match.index + match[0].length;
+    const start = i;
     while (i < css.length && depth > 0) {
-      if (css[i] === '{') depth++
-      else if (css[i] === '}') depth--
-      i++
+      if (css[i] === "{") depth++;
+      else if (css[i] === "}") depth--;
+      i++;
     }
     // Extract content between outer braces (excluding the final closing brace)
-    result.push(css.slice(start, i - 1).trim())
+    result.push(css.slice(start, i - 1).trim());
   }
 
-  return result.length > 0 ? result.join('\n') : css.trim()
+  return result.length > 0 ? result.join("\n") : css.trim();
 }
 
 /**
@@ -73,38 +76,41 @@ function stripLayerWrappers(css: string): string {
  * @param tokens - Set of Tailwind class tokens to generate CSS for
  * @returns GenerateCSSResult with CSS string and match info
  */
-export async function generateCSS(tokens: Set<string>, customVariants?: VariantObject[]): Promise<GenerateCSSResult> {
-  const generator = await getGenerator(customVariants)
-  const result = await generator.generate(tokens)
+export async function generateCSS(
+  tokens: Set<string>,
+  customVariants?: VariantObject[],
+): Promise<GenerateCSSResult> {
+  const generator = await getGenerator(customVariants);
+  const result = await generator.generate(tokens);
 
   // Try to get CSS without @layer wrapper; fall back to full CSS and strip manually
-  let css = result.css
+  let css = result.css;
 
   // Strip @layer wrappers if present
-  const hasLayers = css.includes('@layer')
+  const hasLayers = css.includes("@layer");
   if (hasLayers) {
-    css = stripLayerWrappers(css)
+    css = stripLayerWrappers(css);
   }
 
   // Detect unmatched tokens
-  const unmatched = [...tokens].filter(t => !result.matched.has(t))
-  const warnings: Warning[] = unmatched.map(token => ({
-    type: 'unmatched-class' as const,
+  const unmatched = [...tokens].filter((t) => !result.matched.has(t));
+  const warnings: Warning[] = unmatched.map((token) => ({
+    type: "unmatched-class" as const,
     message: `Unmatched Tailwind class: "${token}" -- no CSS generated`,
     location: { line: 0, column: 0 },
-  }))
+  }));
 
   return {
     css,
     matched: result.matched,
     unmatched,
     warnings,
-  }
+  };
 }
 
 /**
  * Reset the singleton generator (for testing only).
  */
 export function resetGenerator(): void {
-  _cache.clear()
+  _cache.clear();
 }

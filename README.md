@@ -30,17 +30,17 @@ export function Button() {
     <button className="bg-blue-500 text-white px-4 py-2 rounded-lg hover:bg-blue-600">
       Click me
     </button>
-  )
+  );
 }
 ```
 
 **Output** - `button.vanilla.tsx`
 
 ```tsx
-import './button.vanilla.css'
+import "./button.vanilla.css";
 
 export function Button() {
-  return <button className="node0">Click me</button>
+  return <button className="node0">Click me</button>;
 }
 ```
 
@@ -87,40 +87,40 @@ This would let you go from Tailwind utility classes to clean, human-readable CSS
 ## Usage - Programmatic API
 
 ```ts
-import { convert } from 'vanillify'
+import { convert } from "vanillify";
 
 const source = `export function Card() {
   return <div className="flex p-4 bg-white rounded-lg">Hello</div>
-}`
+}`;
 
-const { component, css, warnings } = await convert(source, 'Card.tsx')
+const { component, css, warnings } = await convert(source, "Card.tsx");
 ```
 
-| Return field | Description |
-|-------------|-------------|
-| `component` | Rewritten source with indexed class names and a CSS import |
-| `css` | Generated vanilla CSS |
-| `warnings` | Array of `{ type, message, location }` for dynamic or unmatched classes |
+| Return field | Description                                                             |
+| ------------ | ----------------------------------------------------------------------- |
+| `component`  | Rewritten source with indexed class names and a CSS import              |
+| `css`        | Generated vanilla CSS                                                   |
+| `warnings`   | Array of `{ type, message, location }` for dynamic or unmatched classes |
 
 `convert()` is a pure async function - no file I/O, no side effects.
 
 ### Options
 
 ```ts
-const result = await convert(source, 'Card.tsx', {
-  customVariants: `@custom-variant ui-open (&[data-open]);`
-})
+const result = await convert(source, "Card.tsx", {
+  customVariants: `@custom-variant ui-open (&[data-open]);`,
+});
 ```
 
 You can also pass custom variants as an object:
 
 ```ts
-const result = await convert(source, 'Card.tsx', {
+const result = await convert(source, "Card.tsx", {
   customVariants: {
-    'ui-open': '&[data-open]',
-    'ui-checked': '&[data-checked]',
-  }
-})
+    "ui-open": "&[data-open]",
+    "ui-checked": "&[data-checked]",
+  },
+});
 ```
 
 ## Usage - CLI
@@ -139,10 +139,10 @@ npx vanillify "src/Button.tsx" -o dist
 npx vanillify "src/**/*.tsx" -c custom-variants.css
 ```
 
-| Flag | Alias | Description |
-|------|-------|-------------|
-| `--outDir` | `-o` | Output directory (default: alongside input files) |
-| `--customVariants` | `-c` | Path to CSS file with `@custom-variant` definitions |
+| Flag               | Alias | Description                                         |
+| ------------------ | ----- | --------------------------------------------------- |
+| `--outDir`         | `-o`  | Output directory (default: alongside input files)   |
+| `--customVariants` | `-c`  | Path to CSS file with `@custom-variant` definitions |
 
 The CLI outputs `.vanilla.css` and `.vanilla.tsx` (or `.vanilla.jsx`) files, preserving the original file extension.
 
@@ -166,11 +166,11 @@ npx vanillify "src/**/*.tsx" -c custom-variants.css
 Or programmatically:
 
 ```ts
-import { readFileSync } from 'node:fs'
-import { convert } from 'vanillify'
+import { readFileSync } from "node:fs";
+import { convert } from "vanillify";
 
-const variants = readFileSync('custom-variants.css', 'utf-8')
-const result = await convert(source, 'Component.tsx', { customVariants: variants })
+const variants = readFileSync("custom-variants.css", "utf-8");
+const result = await convert(source, "Component.tsx", { customVariants: variants });
 ```
 
 Classes like `ui-open:bg-blue-500` will produce the correct `[data-open]` selector in the output CSS.
@@ -202,14 +202,14 @@ Vanillify sidesteps all of this. The AST parser handles extraction correctly reg
 
 ## Tech Stack
 
-| Component | Technology |
-|-----------|-----------|
+| Component  | Technology                                                                                                                              |
+| ---------- | --------------------------------------------------------------------------------------------------------------------------------------- |
 | CSS engine | [@unocss/core](https://www.npmjs.com/package/@unocss/core) + [@unocss/preset-wind4](https://www.npmjs.com/package/@unocss/preset-wind4) |
-| Parser | [oxc-parser](https://www.npmjs.com/package/oxc-parser) |
-| AST walker | [oxc-walker](https://www.npmjs.com/package/oxc-walker) |
-| CLI | [citty](https://www.npmjs.com/package/citty) + [consola](https://www.npmjs.com/package/consola) |
-| Bundler | [tsdown](https://tsdown.dev/) |
-| Tests | [vitest](https://vitest.dev/) |
+| Parser     | [oxc-parser](https://www.npmjs.com/package/oxc-parser)                                                                                  |
+| AST walker | [oxc-walker](https://www.npmjs.com/package/oxc-walker)                                                                                  |
+| CLI        | [citty](https://www.npmjs.com/package/citty) + [consola](https://www.npmjs.com/package/consola)                                         |
+| Bundler    | [tsdown](https://tsdown.dev/)                                                                                                           |
+| Tests      | [vitest](https://vitest.dev/)                                                                                                           |
 
 ## License
 
