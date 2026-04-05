@@ -1,7 +1,14 @@
+import { charIn, createRegExp, global } from "magic-regexp";
 import type { VariantObject } from "@unocss/core";
 import type { NodeEntry, Warning } from "../types";
 import type { NameMap } from "./namer";
 import { generateCSS } from "./generator";
+
+/** Matches regex metacharacters for escaping in dynamically-built patterns */
+const REGEX_META_RE = createRegExp(charIn(".*+?^${}()|[]\\"), [global]);
+
+/** Matches CSS selector special characters that UnoCSS escapes */
+const CSS_SELECTOR_RE = createRegExp(charIn("[]#()/:,.%@!").grouped(), [global]);
 
 export interface RewriteResult {
   /** Source with className values replaced by indexed names */
@@ -94,7 +101,7 @@ function extractDefaultLayer(rawCSS: string): string {
  * Escape a string for use in a regular expression.
  */
 function escapeRegex(str: string): string {
-  return str.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  return str.replace(REGEX_META_RE, "\\$&");
 }
 
 /**
@@ -104,7 +111,7 @@ function escapeRegex(str: string): string {
  */
 function buildSelectorPattern(className: string): string {
   // UnoCSS escapes these characters in CSS selectors: [ ] # ( ) / : , . % @ !
-  const escaped = className.replace(/([[\]#()/:,.%@!])/g, "\\$1");
+  const escaped = className.replace(CSS_SELECTOR_RE, "\\$1");
   return escaped;
 }
 
@@ -216,10 +223,12 @@ function buildNodeCSS(nodeName: string, rawCSS: string, classNames: string[]): s
 function matchesAnyPattern(line: string, patterns: string[]): boolean {
   for (const pattern of patterns) {
     try {
+      // INTENTIONALLY RAW: pattern is constructed dynamically at runtime from user class names;
+      // magic-regexp requires static string literals and cannot handle runtime concatenation
       const re = new RegExp(pattern + "(?:[:{\\s]|$)");
       if (re.test(line)) return true;
     } catch {
-      // If regex fails, try simple string matching
+      // INTENTIONALLY RAW: fallback string replacement for escaped backslashes
       if (line.includes(pattern.replace(/\\\\/g, "\\"))) return true;
     }
   }
