@@ -111,8 +111,8 @@ Plans:
 **Plans:** 2 plans
 
 Plans:
-- [ ] 05-01-PLAN.md -- Install magic-regexp, configure transform plugin, convert simple patterns
-- [ ] 05-02-PLAN.md -- Convert complex patterns (parser, generator, rewriter) and document dynamic patterns
+- [x] 05-01-PLAN.md -- Install magic-regexp, configure transform plugin, convert simple patterns
+- [x] 05-02-PLAN.md -- Convert complex patterns (parser, generator, rewriter) and document dynamic patterns
 
 ### Phase 6: Theme Support
 **Goal**: Users can provide a Tailwind v4 `@theme` CSS block and get correct CSS output for theme-defined utility classes
@@ -124,12 +124,33 @@ Plans:
   3. Sequential calls with different `themeCss` values produce different CSS output (generator cache correctly invalidated by theme identity)
   4. `npx vanillify --theme theme.css src/**/*.tsx` reads the CSS file and passes theme to the conversion pipeline, producing theme-aware output
   5. Calling `convert()` without `themeCss` produces identical output to v1.0 -- the feature is fully opt-in with zero regression
-**Plans**: TBD
+**Plans:** 3 plans
+
+Plans:
+- [x] 06-01-PLAN.md -- Theme types, @theme CSS parser, and namespace mapper (TDD)
+- [x] 06-02-PLAN.md -- Generator theme config, pipeline wiring, and integration tests (TDD)
+- [x] 06-03-PLAN.md -- CLI --theme flag and end-to-end verification
+
+### Phase 7: Add CSS Modules Output Support
+**Goal**: Users can choose CSS Modules as an output format via `convert()` option or `--format css-modules` CLI flag, producing `styles.nodeN` JSX expressions with import statements and `.module.css` file extensions
+**Depends on**: Phase 6
+**Requirements**: MOD-01, MOD-02, MOD-03, MOD-04, MOD-05, MOD-06, MOD-07, MOD-08
+**Success Criteria** (what must be TRUE):
+  1. `convert(source, filename, { outputFormat: 'css-modules' })` produces component output with `{styles.nodeN}` JSX expressions and `import styles from './filename.module.css'`
+  2. CSS output content is identical between vanilla and css-modules formats (only JSX references and file extension change)
+  3. `npx vanillify --format css-modules src/**/*.tsx` writes `.module.css` files instead of `.vanilla.css`
+  4. Calling `convert()` without `outputFormat` produces identical output to current behavior (fully backward compatible)
+  5. Dynamic class expressions remain unchanged regardless of output format
+**Plans:** 2 plans
+
+Plans:
+- [ ] 07-01-PLAN.md -- OutputFormat types, format-aware rewriter, convert() threading (TDD)
+- [ ] 07-02-PLAN.md -- CLI --format flag and CLAUDE.md constraint update
 
 ## Progress
 
 **Execution Order:**
-Phases execute in numeric order: 4 -> 5 -> 6
+Phases execute in numeric order: 4 -> 5 -> 6 -> 7
 
 | Phase | Milestone | Plans Complete | Status | Completed |
 |-------|-----------|----------------|--------|-----------|
@@ -138,4 +159,5 @@ Phases execute in numeric order: 4 -> 5 -> 6
 | 3. CLI and Package | v1.0 | 2/2 | Complete | 2026-04-05 |
 | 4. Toolchain Foundation | v1.1 | 0/3 | Not started | - |
 | 5. Code Quality | v1.1 | 0/2 | Not started | - |
-| 6. Theme Support | v1.1 | 0/? | Not started | - |
+| 6. Theme Support | v1.1 | 0/3 | Not started | - |
+| 7. CSS Modules Output | v1.2 | 0/2 | Not started | - |

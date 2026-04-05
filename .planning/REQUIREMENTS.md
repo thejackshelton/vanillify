@@ -43,6 +43,19 @@ Requirements for Toolchain & Theme Support milestone.
 - [ ] **THEME-09**: Per-namespace conformance table documented with status: direct preset mapping, vanillify-added, or unsupported
 - [ ] **THEME-10**: Calling `convert()` without `themeCss` produces identical output to v1.0 -- fully opt-in
 
+## v1.2 Requirements
+
+### CSS Modules Output
+
+- [ ] **MOD-01**: `convert()` accepts `outputFormat: 'vanilla' | 'css-modules'` option (default: `'vanilla'`)
+- [ ] **MOD-02**: When `outputFormat` is `'css-modules'`, component output uses `{styles.nodeN}` JSX expressions instead of `"nodeN"` string literals
+- [ ] **MOD-03**: When `outputFormat` is `'css-modules'`, component output includes `import styles from './filename.module.css'` statement inserted after existing imports
+- [ ] **MOD-04**: CSS output content is identical between vanilla and css-modules formats (only file extension and JSX references change)
+- [ ] **MOD-05**: CLI accepts `--format` / `-f` flag with values `vanilla` (default) and `css-modules`
+- [ ] **MOD-06**: CLI writes `.module.css` extension when format is `css-modules`, `.vanilla.css` when format is `vanilla`
+- [ ] **MOD-07**: Calling `convert()` without `outputFormat` produces identical output to current behavior (backward compatible)
+- [ ] **MOD-08**: Dynamic class expressions remain unchanged (with warnings) regardless of output format
+
 ## v2 Requirements
 
 Deferred to future release. Tracked but not in current roadmap.
@@ -53,7 +66,6 @@ Deferred to future release. Tracked but not in current roadmap.
 - **ENH-02**: Local AI model integration for semantic class naming
 - **ENH-03**: HTML file support (non-JSX inputs)
 - **ENH-04**: Watch mode for development workflows
-- **ENH-05**: CSS Modules output format option
 
 ## Out of Scope
 
@@ -92,12 +104,21 @@ Which phases cover which requirements. Updated during roadmap creation.
 | THEME-08 | Phase 6 | Pending |
 | THEME-09 | Phase 6 | Pending |
 | THEME-10 | Phase 6 | Pending |
+| MOD-01 | Phase 7 | Pending |
+| MOD-02 | Phase 7 | Pending |
+| MOD-03 | Phase 7 | Pending |
+| MOD-04 | Phase 7 | Pending |
+| MOD-05 | Phase 7 | Pending |
+| MOD-06 | Phase 7 | Pending |
+| MOD-07 | Phase 7 | Pending |
+| MOD-08 | Phase 7 | Pending |
 
 **Coverage:**
 - v1.1 requirements: 17 total
-- Mapped to phases: 17
+- v1.2 requirements: 8 total
+- Mapped to phases: 25
 - Unmapped: 0
 
 ---
 *Requirements defined: 2026-04-05*
-*Last updated: 2026-04-05 after v1.1 roadmap creation*
+*Last updated: 2026-04-05 after Phase 7 planning*

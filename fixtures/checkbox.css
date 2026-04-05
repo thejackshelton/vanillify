@@ -31,6 +31,9 @@
 .node2[ui-disabled] {
   color:color-mix(in oklab, var(--colors-slate-50) var(--un-text-opacity), transparent);
 }
+.node2 {
+  color:color-mix(in oklab, var(--colors-white) var(--un-text-opacity), transparent);
+}
 }
 
 .node3[ui-checked] {

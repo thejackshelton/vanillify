@@ -358,7 +358,7 @@ function rewriteSelectorsInBlock(block: string, patterns: string[], selector: st
   const result: string[] = [wrapper];
 
   // Process inner rules
-  let i = 1;
+  let i = 0;
   const innerLines = lines.slice(1);
   const innerDeclarations: string[] = [];
 

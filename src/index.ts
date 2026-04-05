@@ -60,9 +60,11 @@ export async function convert(
   return {
     component: result.component,
     css: result.css,
-    themeCss: result.themeCss ?? "",
+    themeCss: options?.themeCss ? (result.themeCss ?? "") : "",
     warnings: [...themeWarnings, ...result.warnings],
   };
 }
 
+export { parseThemeCss } from "./theme/parser";
+export { mapToThemeConfig } from "./theme/mapper";
 export type { ConvertOptions, ConvertResult, Warning, NodeEntry } from "./types";
