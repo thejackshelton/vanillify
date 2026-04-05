@@ -82,6 +82,8 @@ Right now vanillify uses indexed class names (`.node0`, `.node1`, ...). The inte
 
 This would let you go from Tailwind utility classes to clean, human-readable CSS without manually naming anything.
 
+> Local models, such as Gemma 4B can be used in workflows at no cost.
+
 ## Usage - Programmatic API
 
 ```ts
