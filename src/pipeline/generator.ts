@@ -1,7 +1,26 @@
+import {
+  anyOf,
+  createRegExp,
+  exactly,
+  global,
+  oneOrMore,
+  whitespace,
+  wordChar,
+} from "magic-regexp";
 import { createGenerator } from "@unocss/core";
 import type { VariantObject } from "@unocss/core";
 import presetWind4 from "@unocss/preset-wind4";
 import type { Warning } from "../types";
+
+/** Matches @layer wrapper declarations for stripping */
+const LAYER_RE = createRegExp(
+  exactly("@layer")
+    .and(oneOrMore(whitespace))
+    .and(oneOrMore(anyOf(wordChar, exactly("-"))))
+    .and(whitespace.times.any())
+    .and(exactly("{")),
+  [global],
+);
 
 // Generator cache keyed by sorted variant names -- prevents unbounded growth (T-02-04)
 const _cache = new Map<string, Awaited<ReturnType<typeof createGenerator>>>();
@@ -50,10 +69,12 @@ export interface GenerateCSSResult {
 function stripLayerWrappers(css: string): string {
   // Match @layer blocks and extract inner content, handling nested braces
   const result: string[] = [];
-  const regex = /@layer\s+[\w-]+\s*\{/g;
   let match: RegExpExecArray | null;
 
-  while ((match = regex.exec(css)) !== null) {
+  // Reset regex state for reuse
+  LAYER_RE.lastIndex = 0;
+
+  while ((match = LAYER_RE.exec(css)) !== null) {
     let depth = 1;
     let i = match.index + match[0].length;
     const start = i;
