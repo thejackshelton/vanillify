@@ -1,4 +1,5 @@
 import { defineConfig } from "vite-plus";
+import { MagicRegExpTransformPlugin } from "magic-regexp/transform";
 
 export default defineConfig({
   pack: {
@@ -6,6 +7,7 @@ export default defineConfig({
     format: ["esm", "cjs"],
     dts: true,
     clean: true,
+    plugins: [MagicRegExpTransformPlugin.rollup()],
   },
   test: {
     environment: "node",
