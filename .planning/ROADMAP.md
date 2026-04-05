@@ -64,7 +64,7 @@ Plans:
 **Plans:** 2 plans
 
 Plans:
-- [ ] 03-01-PLAN.md — CLI entry point, dependencies, tsdown dual-entry build
+- [x] 03-01-PLAN.md — CLI entry point, dependencies, tsdown dual-entry build
 - [ ] 03-02-PLAN.md — Fixture-based snapshot tests with toMatchFileSnapshot
 
 **UI hint**: no

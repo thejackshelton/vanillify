@@ -32,13 +32,13 @@ Requirements for initial release. Each maps to roadmap phases.
 
 ### CLI
 
-- [ ] **CLI-01**: CLI accepts file paths/globs as input and writes converted files to disk
-- [ ] **CLI-02**: CLI wraps the programmatic API (no separate conversion logic)
+- [x] **CLI-01**: CLI accepts file paths/globs as input and writes converted files to disk
+- [x] **CLI-02**: CLI wraps the programmatic API (no separate conversion logic)
 
 ### Build & Package
 
-- [ ] **PKG-01**: Library built with tsdown, dual ESM+CJS output
-- [ ] **PKG-02**: Library exports typed API via package.json exports field
+- [x] **PKG-01**: Library built with tsdown, dual ESM+CJS output
+- [x] **PKG-02**: Library exports typed API via package.json exports field
 - [ ] **PKG-03**: Tests run via vitest with fixture-based snapshots (Qwik checkbox example as primary fixture)
 
 ## v2 Requirements
@@ -84,10 +84,10 @@ Which phases cover which requirements. Updated during roadmap creation.
 | CVAR-01 | Phase 2 | Complete |
 | CVAR-02 | Phase 2 | Complete |
 | CVAR-03 | Phase 2 | Complete |
-| CLI-01 | Phase 3 | Pending |
-| CLI-02 | Phase 3 | Pending |
-| PKG-01 | Phase 3 | Pending |
-| PKG-02 | Phase 3 | Pending |
+| CLI-01 | Phase 3 | Complete |
+| CLI-02 | Phase 3 | Complete |
+| PKG-01 | Phase 3 | Complete |
+| PKG-02 | Phase 3 | Complete |
 | PKG-03 | Phase 3 | Pending |
 
 **Coverage:**
