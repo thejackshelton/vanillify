@@ -26,7 +26,7 @@ Requirements for initial release. Each maps to roadmap phases.
 
 ### Custom Variants
 
-- [ ] **CVAR-01**: User can opt-in to custom variant resolution by providing `@custom-variant` CSS definitions
+- [x] **CVAR-01**: User can opt-in to custom variant resolution by providing `@custom-variant` CSS definitions
 - [ ] **CVAR-02**: Custom variants (e.g. ui-checked, ui-disabled, ui-mixed) resolve to simplified descendant selectors in vanilla CSS output
 - [ ] **CVAR-03**: Custom variant resolution does not affect core pipeline when not opted in
 
@@ -81,7 +81,7 @@ Which phases cover which requirements. Updated during roadmap creation.
 | VARI-01 | Phase 1 | Complete |
 | VARI-02 | Phase 1 | Complete |
 | VARI-03 | Phase 1 | Complete |
-| CVAR-01 | Phase 2 | Pending |
+| CVAR-01 | Phase 2 | Complete |
 | CVAR-02 | Phase 2 | Pending |
 | CVAR-03 | Phase 2 | Pending |
 | CLI-01 | Phase 3 | Pending |
