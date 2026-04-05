@@ -22,11 +22,11 @@ export function parseThemeCss(themeCss: string): ParseThemeResult {
 
   const warnings: Warning[] = [];
 
-  // Extract content from @theme { ... } wrapper, or use as bare declarations
+  // Extract content from all @theme { ... } blocks, or use as bare declarations
   let content: string;
-  const themeBlockMatch = trimmed.match(/@theme\s*\{([\s\S]*)\}/);
-  if (themeBlockMatch) {
-    content = themeBlockMatch[1];
+  const themeBlocks = [...trimmed.matchAll(/@theme\s*\{([^}]*)\}/g)];
+  if (themeBlocks.length > 0) {
+    content = themeBlocks.map((m) => m[1]).join("\n");
   } else {
     content = trimmed;
   }
