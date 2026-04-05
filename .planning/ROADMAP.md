@@ -13,7 +13,7 @@ Vanillify is built in three phases that follow the natural dependency graph of t
 Decimal phases appear between their surrounding integers in numeric order.
 
 - [x] **Phase 1: Core Pipeline** - Complete convert() function: AST extraction, UnoCSS CSS generation, indexed naming, source rewriting, and all standard variants (completed 2026-04-05)
-- [ ] **Phase 2: Custom Variant Resolution** - Opt-in @custom-variant parsing and translation layer for QDS and user-defined variants
+- [x] **Phase 2: Custom Variant Resolution** - Opt-in @custom-variant parsing and translation layer for QDS and user-defined variants (completed 2026-04-05)
 - [ ] **Phase 3: CLI and Package** - CLI wrapper, glob support, dual ESM+CJS build, typed exports, and release packaging
 
 ## Phase Details
@@ -46,7 +46,7 @@ Plans:
   1. User can pass `customVariants` option to `convert()` with `@custom-variant` CSS definitions and get correct descendant-selector CSS for those variants
   2. QDS variants (ui-checked, ui-disabled, ui-mixed) resolve to simplified descendant selectors in the output CSS
   3. Calling `convert()` without `customVariants` produces identical output to Phase 1 — the feature is fully opt-in with zero effect on the default path
-**Plans:** 2 plans
+**Plans:** 2/2 plans complete
 
 Plans:
 - [x] 02-01-PLAN.md — Variant parser, resolver, and types (TDD)
@@ -72,5 +72,5 @@ Phases execute in numeric order: 1 → 2 → 3
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 1. Core Pipeline | 4/4 | Complete    | 2026-04-05 |
-| 2. Custom Variant Resolution | 0/2 | Not started | - |
+| 2. Custom Variant Resolution | 2/2 | Complete    | 2026-04-05 |
 | 3. CLI and Package | 0/TBD | Not started | - |

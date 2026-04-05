@@ -23,8 +23,7 @@ Accurate, reliable conversion of Tailwind classes to vanilla CSS — powered by 
 - [ ] Indexed class naming for generated selectors (`.node0`, `.node1`, etc.)
 - [ ] Handle standard Tailwind v4 utilities (flex, grid, colors, spacing, etc.)
 - [ ] Handle variant prefixes (hover:, focus:, etc.) converting to proper pseudo-selectors
-- [ ] Handle custom `@custom-variant` directives (ui-checked, ui-disabled, ui-mixed, etc.) — converting scoped attribute selectors to simple descendant selectors in vanilla CSS
-- [ ] Support passing a CSS file with `@custom-variant` definitions so the converter knows how to resolve custom variants
+- [ ] Opt-in custom variant resolution: allow users to pass `@custom-variant` definitions (e.g. from a CSS file) so the converter can resolve custom variants like `ui-checked`, `ui-disabled` to simplified descendant selectors in vanilla CSS
 - [ ] Framework-agnostic JSX/TSX parsing (works with any framework, tested against Qwik examples)
 
 ### Out of Scope
