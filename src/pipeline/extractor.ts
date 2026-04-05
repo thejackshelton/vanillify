@@ -1,5 +1,9 @@
+import { createRegExp, oneOrMore, whitespace } from "magic-regexp";
 import { walk } from "oxc-walker";
 import type { NodeEntry, Warning } from "../types";
+
+/** Whitespace split pattern -- shared across all class extraction points */
+const WS_RE = createRegExp(oneOrMore(whitespace));
 
 export interface ExtractResult {
   entries: NodeEntry[];
@@ -30,7 +34,7 @@ export function extract(program: any, source: string): ExtractResult {
         // oxc-parser uses 'Literal' for string values (ESTree spec)
         if (node.value?.type === "Literal" && typeof node.value.value === "string") {
           // Static: className="flex bg-red-500"
-          const classes = node.value.value.split(/\s+/).filter(Boolean);
+          const classes = node.value.value.split(WS_RE).filter(Boolean);
           entries.push({
             nodeIndex: nodeIndex++,
             classNames: classes,
@@ -74,7 +78,7 @@ function extractStaticFragments(expression: any): string[] {
 
   // String literal (ESTree 'Literal' with string value): className={"flex bg-red-500"}
   if (expression.type === "Literal" && typeof expression.value === "string") {
-    fragments.push(...expression.value.split(/\s+/).filter(Boolean));
+    fragments.push(...expression.value.split(WS_RE).filter(Boolean));
   }
   // Ternary: className={cond ? "a b" : "c d"}
   else if (expression.type === "ConditionalExpression") {
@@ -89,7 +93,7 @@ function extractStaticFragments(expression: any): string[] {
   else if (expression.type === "TemplateLiteral") {
     for (const quasi of expression.quasis ?? []) {
       if (quasi.value?.cooked) {
-        fragments.push(...quasi.value.cooked.split(/\s+/).filter(Boolean));
+        fragments.push(...quasi.value.cooked.split(WS_RE).filter(Boolean));
       }
     }
   }

@@ -1,10 +1,16 @@
 #!/usr/bin/env node
+import { createRegExp, exactly, maybe } from "magic-regexp";
 import { defineCommand, runMain } from "citty";
 import { consola } from "consola";
 import { glob } from "tinyglobby";
 import { basename, dirname, join, resolve } from "pathe";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { convert } from "./index";
+
+/** Matches JSX/TSX file extensions at end of string */
+const EXT_RE = createRegExp(
+  exactly(".").and(exactly("ts").or(exactly("js"))).and(maybe(exactly("x"))),
+).at.lineEnd();
 
 const main = defineCommand({
   meta: {
@@ -59,8 +65,8 @@ const main = defineCommand({
 
         // Determine output paths -- never overwrite originals
         const dir = args.outDir ? resolve(args.outDir) : dirname(absPath);
-        const name = basename(file).replace(/\.(tsx?|jsx?)$/, "");
-        const ext = file.match(/\.(tsx?|jsx?)$/)?.[0] ?? ".tsx";
+        const name = basename(file).replace(EXT_RE, "");
+        const ext = file.match(EXT_RE)?.[0] ?? ".tsx";
 
         await mkdir(dir, { recursive: true });
         await writeFile(join(dir, `${name}.vanilla.css`), result.css);

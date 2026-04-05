@@ -1,6 +1,9 @@
+import { createRegExp, exactly } from "magic-regexp";
 import type { VariantObject } from "@unocss/core";
 import type { CustomVariantsOption } from "./types";
 import { parseCustomVariantCSS } from "./parser";
+
+const AMPERSAND_RE = createRegExp(exactly("&"), ["g"]);
 
 /**
  * Create a UnoCSS VariantObject from a variant name and selector template.
@@ -23,7 +26,7 @@ export function createVariantObject(name: string, selectorTemplate: string): Var
       }
       return {
         matcher: matcher.slice(prefix.length),
-        selector: (s: string) => selectorTemplate.replace(/&/g, s),
+        selector: (s: string) => selectorTemplate.replace(AMPERSAND_RE, s),
       };
     },
   };
