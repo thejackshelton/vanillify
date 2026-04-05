@@ -15,7 +15,7 @@ Requirements for initial release. Each maps to roadmap phases.
 - [ ] **CORE-04**: Generated CSS uses indexed class names (`.node0`, `.node1`, etc.) assigned per JSX element
 - [ ] **CORE-05**: Output CSS is formatted and readable (not minified)
 - [ ] **CORE-06**: Transformed component replaces Tailwind class strings with generated class names
-- [ ] **CORE-07**: Dynamic class expressions (ternaries, template literals, clsx) are detected and warned, not silently skipped
+- [x] **CORE-07**: Dynamic class expressions (ternaries, template literals, clsx) are detected and warned, not silently skipped
 - [ ] **CORE-08**: Library handles arbitrary Tailwind values (e.g. `text-[#ff0000]`, `w-[calc(100%-1rem)]`)
 
 ### Variants
@@ -76,7 +76,7 @@ Which phases cover which requirements. Updated during roadmap creation.
 | CORE-04 | Phase 1 | Pending |
 | CORE-05 | Phase 1 | Pending |
 | CORE-06 | Phase 1 | Pending |
-| CORE-07 | Phase 1 | Pending |
+| CORE-07 | Phase 1 | Complete |
 | CORE-08 | Phase 1 | Pending |
 | VARI-01 | Phase 1 | Pending |
 | VARI-02 | Phase 1 | Pending |
