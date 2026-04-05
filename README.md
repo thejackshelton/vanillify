@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="vanillify-logo.webp" alt="Vanillify" width="200" />
+  <img src="vanillify-logo.png" alt="Vanillify" width="200" />
 </p>
 
 <h1 align="center">Vanillify</h1>
