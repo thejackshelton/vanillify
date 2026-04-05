@@ -258,4 +258,15 @@ describe("regression baseline - theme warning paths", () => {
       resolve(FIXTURES, "theme-reset-warnings.json"),
     );
   });
+
+  it("captures unknown theme namespace warnings", async () => {
+    const source = `<div className="flex">hi</div>`;
+    const result = await convert(source, "test.tsx", {
+      themeCss: "@theme { --unknown-thing: value; }",
+    });
+
+    await expect(JSON.stringify(result.warnings, null, 2)).toMatchFileSnapshot(
+      resolve(FIXTURES, "theme-unknown-namespace-warnings.json"),
+    );
+  });
 });

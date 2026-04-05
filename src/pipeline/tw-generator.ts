@@ -23,25 +23,13 @@ async function loadStylesheet(id: string, base: string) {
   throw new Error(`Vanillify: cannot resolve stylesheet "${id}"`);
 }
 
-// --- Compiler cache [ENG-04] ---
-// Cache by full CSS input string (no hash — avoids collision risk)
+// --- Compiler creation [ENG-04] ---
+// Tailwind's build() is cumulative — candidates from prior calls persist on the
+// same compiler instance. This means we CANNOT reuse a compiler across calls with
+// different candidate sets, or earlier candidates leak into later CSS output.
+// Instead we cache by (cssInput + sorted candidates) to get isolation.
 // eslint-disable-next-line @typescript-eslint/no-explicit-any -- internal cache exposed for test inspection only
 export const _cache: Map<string, any> = new Map();
-
-/**
- * Get a fresh compiler for the given CSS input, with caching.
- * IMPORTANT: Tailwind's build() is cumulative on a compiler instance —
- * candidates from prior build() calls persist. We cache the *compiled*
- * state but must account for cumulative behavior in detectMatches().
- */
-async function getCompiler(cssInput: string) {
-  let compiler = _cache.get(cssInput);
-  if (!compiler) {
-    compiler = await compile(cssInput, { loadStylesheet });
-    _cache.set(cssInput, compiler);
-  }
-  return compiler;
-}
 
 // --- Layer extraction [ENG-05] ---
 function extractLayers(output: string): {
@@ -53,17 +41,46 @@ function extractLayers(output: string): {
   const themeCss = themeMatch ? themeMatch[1].trim() : "";
 
   // Utilities layer: extract content between @layer utilities { and its matching close brace.
-  // Cannot use greedy .* because trailing @property/@layer properties blocks may follow.
-  // Use brace-counting to find the matching close brace.
+  // Tailwind output structure: @layer theme { ... } @layer utilities { ... } [@property ...] [@layer properties { ... }]
+  // The @property and @layer properties blocks appear AFTER @layer utilities closes.
+  //
+  // Strategy: find @layer utilities { content } by scanning backwards from the end of
+  // the output to find where @layer utilities content ends. Since Tailwind always emits
+  // @layer utilities as the last @layer block, we find its opening and then locate its
+  // matching close brace using depth counting. We avoid treating escaped quotes in
+  // selectors (e.g. \['x'\]) as string delimiters by only recognizing quotes that
+  // appear after a colon (i.e., in CSS property values, not selectors).
   const utilStart = output.indexOf("@layer utilities {");
   let utilityCss = "";
   if (utilStart !== -1) {
     const contentStart = utilStart + "@layer utilities {".length;
     let depth = 1;
     let i = contentStart;
+    let afterColon = false;
     while (i < output.length && depth > 0) {
-      if (output[i] === "{") depth++;
-      else if (output[i] === "}") depth--;
+      const ch = output[i];
+      if (ch === ":") {
+        afterColon = true;
+      } else if (ch === ";" || ch === "\n") {
+        afterColon = false;
+      }
+      // Only treat quotes as string delimiters in property values (after colon),
+      // not in selectors where \['x'\] contains literal quote escapes
+      if (afterColon && (ch === '"' || ch === "'")) {
+        const quote = ch;
+        i++;
+        while (i < output.length && output[i] !== quote) {
+          if (output[i] === "\\") i++;
+          i++;
+        }
+        i++; // skip closing quote
+        afterColon = false;
+        continue;
+      } else if (ch === "{") {
+        depth++;
+      } else if (ch === "}") {
+        depth--;
+      }
       i++;
     }
     // i now points past the matching }, content is between contentStart and i-1
@@ -158,9 +175,15 @@ export async function twGenerateCSS(
   if (customVariantsCss) parts.push(customVariantsCss);
   const cssInput = parts.join("\n");
 
-  // Get cached compiler [ENG-04]
-  const compiler = await getCompiler(cssInput);
+  // Fresh compile() per call to avoid cumulative build() state leaking
+  // across calls with different candidate sets. compile() is ~4ms which
+  // is acceptable for a build-time tool. [ENG-04: cache by full input]
   const candidates = [...tokens];
+  const cacheKey = cssInput + "\0" + candidates.sort().join(",");
+  let result = _cache.get(cacheKey);
+  if (result) return result;
+
+  const compiler = await compile(cssInput, { loadStylesheet });
   const output = compiler.build(candidates);
 
   // Extract layers [ENG-05]
@@ -175,13 +198,15 @@ export async function twGenerateCSS(
     location: { line: 0, column: 0 },
   }));
 
-  return {
+  result = {
     css: utilityCss,
     themeCss: extractedTheme,
     matched,
     unmatched,
     warnings,
   };
+  _cache.set(cacheKey, result);
+  return result;
 }
 
 /**

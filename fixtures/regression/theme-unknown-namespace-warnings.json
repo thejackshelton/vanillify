@@ -1,0 +1,10 @@
+[
+  {
+    "type": "unknown-theme-namespace",
+    "message": "Unknown theme namespace for \"--unknown-thing\": passing through as custom key",
+    "location": {
+      "line": 0,
+      "column": 0
+    }
+  }
+]

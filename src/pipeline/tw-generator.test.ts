@@ -74,12 +74,20 @@ describe("ENG-04: compiler caching", () => {
     resetTwGenerator();
   });
 
-  it("caches compiler instance for identical CSS input", async () => {
+  it("caches result for identical input (cssInput + candidates)", async () => {
+    await twGenerateCSS(new Set(["flex"]));
+    await twGenerateCSS(new Set(["flex"]));
+
+    // Same CSS input AND same candidates -- should reuse cached result
+    expect(_cache.size).toBe(1);
+  });
+
+  it("creates separate cache entries for different candidates", async () => {
     await twGenerateCSS(new Set(["flex"]));
     await twGenerateCSS(new Set(["p-4"]));
 
-    // Same CSS input (no themeCss/customVariantsCss) -- should reuse compiler
-    expect(_cache.size).toBe(1);
+    // Same CSS input but different candidates -- separate entries for isolation
+    expect(_cache.size).toBe(2);
   });
 
   it("creates new compiler for different CSS input", async () => {
@@ -159,15 +167,18 @@ describe("Codex review fixes", () => {
     resetTwGenerator();
   });
 
-  it("build() cumulative state does not leak matched classes between calls", async () => {
+  it("build() cumulative state does not leak matched classes or CSS between calls", async () => {
     // First call generates flex
     const result1 = await twGenerateCSS(new Set(["flex"]));
     expect(result1.matched).toContain("flex");
+    expect(result1.css).toContain(".flex");
 
-    // Second call with p-4 only — should NOT report flex as matched
+    // Second call with p-4 only — should NOT contain flex in matched OR css
     const result2 = await twGenerateCSS(new Set(["p-4"]));
     expect(result2.matched).toContain("p-4");
     expect(result2.matched).not.toContain("flex");
+    expect(result2.css).toContain(".p-4");
+    expect(result2.css).not.toContain(".flex");
     expect(result2.unmatched).toEqual([]);
   });
 
@@ -187,5 +198,16 @@ describe("Codex review fixes", () => {
     expect(result.css).not.toContain("@property");
     expect(result.css).not.toContain("@layer properties");
     expect(result.css).toContain(".flex");
+  });
+
+  it("handles arbitrary values with literal braces in content", async () => {
+    // content-["}"] produces --tw-content: "}" which has braces inside quotes
+    const result = await twGenerateCSS(
+      new Set(["flex", "before:content-[\"}\"]"]),
+    );
+
+    // Should not break layer extraction — flex must still appear
+    expect(result.css).toContain(".flex");
+    expect(result.css).not.toContain("@layer");
   });
 });
