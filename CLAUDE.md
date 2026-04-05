@@ -12,7 +12,7 @@ A Tailwind CSS to vanilla CSS converter library with CLI. It uses UnoCSS's `crea
 
 - **Tech stack**: vite+ toolchain (tsdown, vitest, vite-plus), oxc-parser, UnoCSS — no other parsers or CSS engines
 - **Node.js**: Target modern Node.js (v20+)
-- **Output format**: Vanilla CSS only (not CSS Modules, not SCSS, not PostCSS)
+- **Output format**: Vanilla CSS (default) and CSS Modules — no SCSS, no PostCSS
 - **Class naming**: Indexed only (`.node0`, `.node1`) — no semantic naming in v1
 <!-- GSD:project-end -->
 

@@ -6,7 +6,7 @@ import { glob } from "tinyglobby";
 import { basename, dirname, join, resolve } from "pathe";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { convert } from "./index";
-import type { ConvertOptions } from "./types";
+import type { ConvertOptions, OutputFormat } from "./types";
 
 /** Matches JSX/TSX file extensions at end of string */
 const EXT_RE = createRegExp(
@@ -40,6 +40,12 @@ const main = defineCommand({
       alias: "t",
       description: "Path to CSS file with @theme block definitions",
     },
+    format: {
+      type: "string",
+      alias: "f",
+      description: "Output format: vanilla (default) or css-modules",
+      default: "vanilla",
+    },
   },
   async run({ args }) {
     // Expand globs using tinyglobby (handles citty positional arg behavior)
@@ -65,12 +71,13 @@ const main = defineCommand({
       themeCss = await readFile(resolve(args.theme), "utf-8");
     }
 
-    const options: ConvertOptions | undefined = (customVariantsCSS || themeCss)
-      ? {
-          ...(customVariantsCSS ? { customVariants: customVariantsCSS } : {}),
-          ...(themeCss ? { themeCss } : {}),
-        }
-      : undefined;
+    const outputFormat: OutputFormat = args.format === 'css-modules' ? 'css-modules' : 'vanilla';
+
+    const options: ConvertOptions = {
+      ...(customVariantsCSS ? { customVariants: customVariantsCSS } : {}),
+      ...(themeCss ? { themeCss } : {}),
+      outputFormat,
+    };
 
     let processed = 0;
     for (const file of files) {
@@ -89,8 +96,10 @@ const main = defineCommand({
         const fullCss = result.themeCss
           ? `${result.themeCss}\n\n${result.css}`
           : result.css;
-        await writeFile(join(dir, `${name}.vanilla.css`), fullCss);
-        await writeFile(join(dir, `${name}.vanilla${ext}`), result.component);
+        const cssExt = outputFormat === 'css-modules' ? '.module.css' : '.vanilla.css';
+        const componentExt = outputFormat === 'css-modules' ? `.module${ext}` : `.vanilla${ext}`;
+        await writeFile(join(dir, `${name}${cssExt}`), fullCss);
+        await writeFile(join(dir, `${name}${componentExt}`), result.component);
 
         // Report warnings
         for (const w of result.warnings) {
