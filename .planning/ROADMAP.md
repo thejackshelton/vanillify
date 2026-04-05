@@ -46,7 +46,11 @@ Plans:
   1. User can pass `customVariants` option to `convert()` with `@custom-variant` CSS definitions and get correct descendant-selector CSS for those variants
   2. QDS variants (ui-checked, ui-disabled, ui-mixed) resolve to simplified descendant selectors in the output CSS
   3. Calling `convert()` without `customVariants` produces identical output to Phase 1 — the feature is fully opt-in with zero effect on the default path
-**Plans**: TBD
+**Plans:** 2 plans
+
+Plans:
+- [ ] 02-01-PLAN.md — Variant parser, resolver, and types (TDD)
+- [ ] 02-02-PLAN.md — Pipeline wiring and integration tests (TDD)
 
 ### Phase 3: CLI and Package
 **Goal**: The library is published and usable via `npx vanillify` and `import { convert } from 'vanillify'`
@@ -68,5 +72,5 @@ Phases execute in numeric order: 1 → 2 → 3
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 1. Core Pipeline | 4/4 | Complete    | 2026-04-05 |
-| 2. Custom Variant Resolution | 0/TBD | Not started | - |
+| 2. Custom Variant Resolution | 0/2 | Not started | - |
 | 3. CLI and Package | 0/TBD | Not started | - |
