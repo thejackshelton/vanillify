@@ -1,6 +1,6 @@
 import type { NodeEntry, OutputFormat, Warning } from "../types";
 import type { NameMap } from "./namer";
-import { twGenerateCSS } from "./tw-generator";
+import { twGenerateCSS } from "./generator";
 
 export interface RewriteResult {
   /** Source with className values replaced by indexed names */

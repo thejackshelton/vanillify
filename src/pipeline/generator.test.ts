@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from "vitest";
-import { twGenerateCSS, resetTwGenerator, _cache } from "./tw-generator";
+import { twGenerateCSS, resetTwGenerator, _cache } from "./generator";
 
 describe("ENG-01: compile().build() CSS generation", () => {
   it("generates CSS for standard utility classes", async () => {
