@@ -59,7 +59,8 @@ function extractLayers(output: string): {
     let afterColon = false;
     while (i < output.length && depth > 0) {
       const ch = output[i];
-      if (ch === ":") {
+      // Only unescaped colons signal property values; escaped colons (\:) are selector chars
+      if (ch === ":" && (i === 0 || output[i - 1] !== "\\")) {
         afterColon = true;
       } else if (ch === ";" || ch === "\n") {
         afterColon = false;
@@ -198,13 +199,13 @@ export async function twGenerateCSS(
     location: { line: 0, column: 0 },
   }));
 
-  result = {
+  result = Object.freeze({
     css: utilityCss,
     themeCss: extractedTheme,
     matched,
-    unmatched,
-    warnings,
-  };
+    unmatched: Object.freeze(unmatched),
+    warnings: Object.freeze(warnings),
+  });
   _cache.set(cacheKey, result);
   return result;
 }

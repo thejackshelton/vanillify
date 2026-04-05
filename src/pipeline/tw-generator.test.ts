@@ -190,7 +190,7 @@ describe("Codex review fixes", () => {
   });
 
   it("utility CSS does not contain @property or @layer properties blocks", async () => {
-    // content-["x"] can trigger @property blocks in Tailwind output
+    // content-['x'] triggers @property blocks in Tailwind output
     const result = await twGenerateCSS(
       new Set(["flex", "p-4", "before:content-['x']"]),
     );
@@ -198,6 +198,9 @@ describe("Codex review fixes", () => {
     expect(result.css).not.toContain("@property");
     expect(result.css).not.toContain("@layer properties");
     expect(result.css).toContain(".flex");
+    // Verify content utility is not truncated by quote handling
+    expect(result.css).toContain("content-");
+    expect(result.css).toContain("--tw-content");
   });
 
   it("handles arbitrary values with literal braces in content", async () => {
