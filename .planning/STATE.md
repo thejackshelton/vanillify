@@ -97,10 +97,11 @@ None yet.
 | # | Description | Date | Commit | Directory |
 |---|-------------|------|--------|-----------|
 | 260405-kwh | Convert remaining raw regex to magic-regexp | 2026-04-05 | 67bfb1c | [260405-kwh-convert-remaining-raw-regex-to-magic-reg](./quick/260405-kwh-convert-remaining-raw-regex-to-magic-reg/) |
-| 260405-l1e | Remove customVariants option, rename themeCss to css | 2026-04-05 |  | [260405-l1e-investigate-custom-variant-handling-nece](./quick/260405-l1e-investigate-custom-variant-handling-nece/) |
+| 260405-l1e | Remove customVariants option, rename themeCss to css | 2026-04-05 | f1a9214 | [260405-l1e-investigate-custom-variant-handling-nece](./quick/260405-l1e-investigate-custom-variant-handling-nece/) |
+| 260405-lj7 | Update README for Tailwind v4 and unified css option | 2026-04-05 | d9b0534 | [260405-lj7-update-readme-with-current-api-and-proje](./quick/260405-lj7-update-readme-with-current-api-and-proje/) |
 
 ## Session Continuity
 
 Last session: 2026-04-05
-Stopped at: Quick task 260405-l1e complete
+Stopped at: Quick task 260405-lj7 complete
 Resume file: None
