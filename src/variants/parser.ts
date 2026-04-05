@@ -1,10 +1,34 @@
+import {
+  anyOf,
+  charNotIn,
+  createRegExp,
+  exactly,
+  global,
+  oneOrMore,
+  whitespace,
+  wordChar,
+} from "magic-regexp";
 import type { ParsedVariant } from "./types";
 
 /** Maximum input length to prevent regex DoS (T-02-01) */
 const MAX_INPUT_LENGTH = 10000;
 
-/** Regex for @custom-variant shorthand: @custom-variant <name> (<selector>); */
-const SHORTHAND_RE = /@custom-variant\s+([\w-]+)\s+\(([^)]+)\)\s*;/g;
+/** Matches @custom-variant shorthand: @custom-variant <name> (<selector>); */
+const SHORTHAND_RE = createRegExp(
+  exactly("@custom-variant")
+    .and(oneOrMore(whitespace))
+    .and(oneOrMore(anyOf(wordChar, exactly("-"))).as("name"))
+    .and(oneOrMore(whitespace))
+    .and(exactly("("))
+    .and(oneOrMore(charNotIn(")")).as("selector"))
+    .and(exactly(")"))
+    .and(whitespace.times.any())
+    .and(exactly(";")),
+  [global],
+);
+
+/** Validates variant name contains only word characters and hyphens */
+const NAME_RE = createRegExp(oneOrMore(anyOf(wordChar, exactly("-"))).at.lineStart().at.lineEnd());
 
 /**
  * Parse @custom-variant shorthand directives from a CSS string.
@@ -27,11 +51,11 @@ export function parseCustomVariantCSS(css: string): ParsedVariant[] {
   SHORTHAND_RE.lastIndex = 0;
 
   while ((match = SHORTHAND_RE.exec(css)) !== null) {
-    const name = match[1];
-    const selectorTemplate = match[2].trim();
+    const name = match.groups?.name ?? match[1];
+    const selectorTemplate = (match.groups?.selector ?? match[2]).trim();
 
     // Validate variant name (T-02-02: no CSS special characters)
-    if (!/^[\w-]+$/.test(name)) {
+    if (!NAME_RE.test(name)) {
       continue;
     }
 
