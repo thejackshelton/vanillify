@@ -73,6 +73,4 @@ function variantsRecordToCss(record: Record<string, string>): string {
     .join('\n');
 }
 
-export { parseThemeCss } from "./theme/parser";
-export { mapToThemeConfig } from "./theme/mapper";
-export type { ConvertOptions, ConvertResult, OutputFormat, Warning, NodeEntry } from "./types";
+export type { ConvertOptions, ConvertResult, OutputFormat, Warning, NodeEntry, CustomVariantsOption } from "./types";
