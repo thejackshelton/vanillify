@@ -75,7 +75,8 @@ function extractLayers(output: string): {
           i++;
         }
         i++; // skip closing quote
-        afterColon = false;
+        // Stay in afterColon mode — multiple quoted fragments in one value
+        // (e.g. --tw-content: "}" "{") are all part of the same declaration
         continue;
       } else if (ch === "\\") {
         i++; // skip escaped char — \{ \} \, etc are not structural
