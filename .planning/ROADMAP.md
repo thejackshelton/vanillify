@@ -14,7 +14,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 
 - [x] **Phase 1: Core Pipeline** - Complete convert() function: AST extraction, UnoCSS CSS generation, indexed naming, source rewriting, and all standard variants (completed 2026-04-05)
 - [x] **Phase 2: Custom Variant Resolution** - Opt-in @custom-variant parsing and translation layer for QDS and user-defined variants (completed 2026-04-05)
-- [ ] **Phase 3: CLI and Package** - CLI wrapper, glob support, dual ESM+CJS build, typed exports, and release packaging
+- [x] **Phase 3: CLI and Package** - CLI wrapper, glob support, dual ESM+CJS build, typed exports, and release packaging (completed 2026-04-05)
 
 ## Phase Details
 
@@ -61,11 +61,11 @@ Plans:
   2. CLI delegates all conversion logic to the programmatic API — no conversion code lives in `src/cli.ts`
   3. `import { convert } from 'vanillify'` works in both ESM and CJS environments with full TypeScript types
   4. Vitest fixture tests (Qwik checkbox example) pass and snapshot output is stable
-**Plans:** 2 plans
+**Plans:** 2/2 plans complete
 
 Plans:
 - [x] 03-01-PLAN.md — CLI entry point, dependencies, tsdown dual-entry build
-- [ ] 03-02-PLAN.md — Fixture-based snapshot tests with toMatchFileSnapshot
+- [x] 03-02-PLAN.md — Fixture-based snapshot tests with toMatchFileSnapshot
 
 **UI hint**: no
 
@@ -78,4 +78,4 @@ Phases execute in numeric order: 1 → 2 → 3
 |-------|----------------|--------|-----------|
 | 1. Core Pipeline | 4/4 | Complete    | 2026-04-05 |
 | 2. Custom Variant Resolution | 2/2 | Complete    | 2026-04-05 |
-| 3. CLI and Package | 0/2 | Planning complete | - |
+| 3. CLI and Package | 2/2 | Complete   | 2026-04-05 |

@@ -39,7 +39,7 @@ Requirements for initial release. Each maps to roadmap phases.
 
 - [x] **PKG-01**: Library built with tsdown, dual ESM+CJS output
 - [x] **PKG-02**: Library exports typed API via package.json exports field
-- [ ] **PKG-03**: Tests run via vitest with fixture-based snapshots (Qwik checkbox example as primary fixture)
+- [x] **PKG-03**: Tests run via vitest with fixture-based snapshots (Qwik checkbox example as primary fixture)
 
 ## v2 Requirements
 
@@ -88,7 +88,7 @@ Which phases cover which requirements. Updated during roadmap creation.
 | CLI-02 | Phase 3 | Complete |
 | PKG-01 | Phase 3 | Complete |
 | PKG-02 | Phase 3 | Complete |
-| PKG-03 | Phase 3 | Pending |
+| PKG-03 | Phase 3 | Complete |
 
 **Coverage:**
 - v1 requirements: 19 total
