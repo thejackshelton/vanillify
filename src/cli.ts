@@ -9,8 +9,8 @@ import { convert } from "./index";
 
 /** Matches JSX/TSX file extensions at end of string */
 const EXT_RE = createRegExp(
-  exactly(".").and(exactly("ts").or(exactly("js"))).and(maybe(exactly("x"))),
-).at.lineEnd();
+  exactly(".").and(exactly("ts").or(exactly("js"))).and(maybe(exactly("x"))).at.lineEnd(),
+);
 
 const main = defineCommand({
   meta: {

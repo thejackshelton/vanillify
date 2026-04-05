@@ -93,7 +93,12 @@ Plans:
   3. `vp pack` produces identical dist/ output (same entry points, same exports, same file structure) as the previous `tsdown` build
   4. `vp test` discovers and passes all existing tests with zero behavior change
   5. `vp lint` and `vp fmt` run successfully with project rules configured
-**Plans**: TBD
+**Plans:** 3 plans
+
+Plans:
+- [ ] 04-01-PLAN.md -- Migrate to pnpm and snapshot dist/ baseline
+- [x] 04-02-PLAN.md -- Unified vite-plus config, test import rewrite, build parity verification
+- [x] 04-03-PLAN.md -- Lint and fmt configuration with oxlint and oxfmt
 
 ### Phase 5: Code Quality
 **Goal**: All static regex patterns in the codebase use magic-regexp for readability, and dynamic patterns are explicitly documented as intentionally raw
@@ -103,7 +108,11 @@ Plans:
   1. Every static regex pattern (variant parser, generator layer regex, CLI extension matching, and others) uses magic-regexp -- no raw `/pattern/` literals remain for static patterns
   2. Dynamic regex patterns in rewriter.ts have explicit code comments explaining why they remain as raw RegExp (runtime construction incompatible with magic-regexp)
   3. All existing tests pass with zero behavior change after the regex migration
-**Plans**: TBD
+**Plans:** 2 plans
+
+Plans:
+- [ ] 05-01-PLAN.md -- Install magic-regexp, configure transform plugin, convert simple patterns
+- [ ] 05-02-PLAN.md -- Convert complex patterns (parser, generator, rewriter) and document dynamic patterns
 
 ### Phase 6: Theme Support
 **Goal**: Users can provide a Tailwind v4 `@theme` CSS block and get correct CSS output for theme-defined utility classes
@@ -127,6 +136,6 @@ Phases execute in numeric order: 4 -> 5 -> 6
 | 1. Core Pipeline | v1.0 | 4/4 | Complete | 2026-04-05 |
 | 2. Custom Variant Resolution | v1.0 | 2/2 | Complete | 2026-04-05 |
 | 3. CLI and Package | v1.0 | 2/2 | Complete | 2026-04-05 |
-| 4. Toolchain Foundation | v1.1 | 0/? | Not started | - |
-| 5. Code Quality | v1.1 | 0/? | Not started | - |
+| 4. Toolchain Foundation | v1.1 | 0/3 | Not started | - |
+| 5. Code Quality | v1.1 | 0/2 | Not started | - |
 | 6. Theme Support | v1.1 | 0/? | Not started | - |
