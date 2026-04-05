@@ -70,31 +70,31 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| CORE-01 | - | Pending |
-| CORE-02 | - | Pending |
-| CORE-03 | - | Pending |
-| CORE-04 | - | Pending |
-| CORE-05 | - | Pending |
-| CORE-06 | - | Pending |
-| CORE-07 | - | Pending |
-| CORE-08 | - | Pending |
-| VARI-01 | - | Pending |
-| VARI-02 | - | Pending |
-| VARI-03 | - | Pending |
-| CVAR-01 | - | Pending |
-| CVAR-02 | - | Pending |
-| CVAR-03 | - | Pending |
-| CLI-01 | - | Pending |
-| CLI-02 | - | Pending |
-| PKG-01 | - | Pending |
-| PKG-02 | - | Pending |
-| PKG-03 | - | Pending |
+| CORE-01 | Phase 1 | Pending |
+| CORE-02 | Phase 1 | Pending |
+| CORE-03 | Phase 1 | Pending |
+| CORE-04 | Phase 1 | Pending |
+| CORE-05 | Phase 1 | Pending |
+| CORE-06 | Phase 1 | Pending |
+| CORE-07 | Phase 1 | Pending |
+| CORE-08 | Phase 1 | Pending |
+| VARI-01 | Phase 1 | Pending |
+| VARI-02 | Phase 1 | Pending |
+| VARI-03 | Phase 1 | Pending |
+| CVAR-01 | Phase 2 | Pending |
+| CVAR-02 | Phase 2 | Pending |
+| CVAR-03 | Phase 2 | Pending |
+| CLI-01 | Phase 3 | Pending |
+| CLI-02 | Phase 3 | Pending |
+| PKG-01 | Phase 3 | Pending |
+| PKG-02 | Phase 3 | Pending |
+| PKG-03 | Phase 3 | Pending |
 
 **Coverage:**
 - v1 requirements: 19 total
-- Mapped to phases: 0
-- Unmapped: 19 ⚠️
+- Mapped to phases: 19
+- Unmapped: 0 ✓
 
 ---
 *Requirements defined: 2026-04-04*
-*Last updated: 2026-04-04 after initial definition*
+*Last updated: 2026-04-04 after roadmap creation*
