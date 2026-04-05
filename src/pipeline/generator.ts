@@ -43,30 +43,35 @@ function extractLayers(output: string): {
   const themeCss = themeMatch ? themeMatch[1].trim() : "";
 
   // Utilities layer: Tailwind always emits @layer utilities { ... } as the last @layer block,
-  // optionally followed by @property and/or @layer properties blocks on new lines.
-  // Rather than parsing CSS braces (which is fragile with escaped chars, quoted values, etc.),
-  // we find the boundary by locating the first post-utilities directive and scanning backwards
-  // to find the closing } of @layer utilities.
+  // optionally followed by @keyframes, @property, and/or @layer properties blocks.
+  //
+  // We extract the utility rules from inside @layer utilities, PLUS any @keyframes blocks
+  // that follow (needed for animation utilities like animate-spin). We strip @property and
+  // @layer properties (browser support blocks) as they are implementation details.
   const utilStart = output.indexOf("@layer utilities {");
   let utilityCss = "";
   if (utilStart !== -1) {
     const contentStart = utilStart + "@layer utilities {".length;
 
-    // Find where post-utilities blocks begin (if any).
-    // Tailwind may emit @property, @layer properties, @keyframes, etc. after @layer utilities.
-    // All top-level directives start with \n@ at column 0. Find the first such occurrence
-    // after the utilities content (skipping the \n@ inside nested rules by requiring
-    // it appears after the utilities block closes — we search from contentStart and
-    // the pattern \n}\n@ reliably marks the end of @layer utilities followed by a directive).
+    // Find where post-utilities blocks begin using \n}\n@ boundary pattern.
     const closePattern = "\n}\n@";
     const closeIdx = output.indexOf(closePattern, contentStart);
-    // endBoundary is right after the closing } of @layer utilities
-    const endBoundary = closeIdx !== -1 ? closeIdx + 2 : output.length; // +2 to include \n}
+    const endBoundary = closeIdx !== -1 ? closeIdx + 2 : output.length;
 
-    // The closing } of @layer utilities is the last } before the endBoundary
+    // Extract utility rules (content inside @layer utilities { ... })
     const slice = output.slice(contentStart, endBoundary);
     const lastBrace = slice.lastIndexOf("}");
     utilityCss = lastBrace !== -1 ? slice.slice(0, lastBrace).trim() : slice.trim();
+
+    // Append @keyframes blocks that follow @layer utilities.
+    // These are required for animation utilities (animate-spin, animate-pulse, etc.)
+    // RATIONALE: stays raw -- magic-regexp lacks global/multiline flags with backrefs.
+    const postUtilities = output.slice(endBoundary + 1); // everything after @layer utilities }
+    const keyframesRe = /@keyframes\s+[\w-]+\s*\{[^}]*(?:\{[^}]*\}[^}]*)*\}/g;
+    let kfMatch;
+    while ((kfMatch = keyframesRe.exec(postUtilities)) !== null) {
+      utilityCss += "\n" + kfMatch[0];
+    }
   }
 
   return { themeCss, utilityCss };

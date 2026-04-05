@@ -212,12 +212,16 @@ describe("Codex review fixes", () => {
     expect(result.css).not.toContain("@layer");
   });
 
-  it("animation utilities do not leak @keyframes into css output", async () => {
+  it("animation utilities include @keyframes in css output", async () => {
     const result = await twGenerateCSS(new Set(["flex", "animate-spin"]));
 
     expect(result.css).toContain(".flex");
     expect(result.css).toContain(".animate-spin");
-    expect(result.css).not.toContain("@keyframes");
+    expect(result.css).toContain("@keyframes spin");
+    expect(result.css).toContain("rotate(360deg)");
+    // @property and @layer properties should still be excluded
+    expect(result.css).not.toContain("@property");
+    expect(result.css).not.toContain("@layer");
     expect(result.matched).toContain("animate-spin");
   });
 });
