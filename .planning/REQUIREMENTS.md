@@ -35,14 +35,14 @@ Requirements for the Tailwind compile() engine migration.
 ### Regression
 
 - [x] **REG-01**: Snapshot tests capture current `convert()` output for all existing fixtures before any engine changes
-- [ ] **REG-02**: Unmatched Tailwind classes produce `unmatched-class` warnings via CSS output inspection (replacing UnoCSS's `matched` set)
+- [x] **REG-02**: Unmatched Tailwind classes produce `unmatched-class` warnings via CSS output inspection (replacing UnoCSS's `matched` set)
 - [ ] **REG-03**: All existing tests pass after engine swap with updated assertions for Tailwind's CSS output format
 
 ### Rewriter
 
-- [ ] **RWR-01**: Selector rewriting works correctly with Tailwind's native CSS output (nesting, media query range syntax, escaping)
-- [ ] **RWR-02**: Per-node CSS isolation produces correct output — each node's CSS contains only rules for that node's classes
-- [ ] **RWR-03**: `@layer` wrappers in Tailwind output are handled correctly (stripped or preserved as appropriate)
+- [x] **RWR-01**: Selector rewriting works correctly with Tailwind's native CSS output (nesting, media query range syntax, escaping)
+- [x] **RWR-02**: Per-node CSS isolation produces correct output — each node's CSS contains only rules for that node's classes
+- [x] **RWR-03**: `@layer` wrappers in Tailwind output are handled correctly (stripped or preserved as appropriate)
 
 ### Cleanup
 
@@ -104,11 +104,11 @@ Which phases cover which requirements. Updated during roadmap creation.
 | ENG-04 | Phase 9 | Complete |
 | ENG-05 | Phase 9 | Complete |
 | REG-01 | Phase 8 | Complete |
-| REG-02 | Phase 10 | Pending |
+| REG-02 | Phase 10 | Complete |
 | REG-03 | Phase 10 | Pending |
-| RWR-01 | Phase 10 | Pending |
-| RWR-02 | Phase 10 | Pending |
-| RWR-03 | Phase 10 | Pending |
+| RWR-01 | Phase 10 | Complete |
+| RWR-02 | Phase 10 | Complete |
+| RWR-03 | Phase 10 | Complete |
 | CLN-01 | Phase 11 | Pending |
 | CLN-02 | Phase 11 | Pending |
 | CLN-03 | Phase 11 | Pending |
