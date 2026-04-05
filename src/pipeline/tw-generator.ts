@@ -77,6 +77,8 @@ function extractLayers(output: string): {
         i++; // skip closing quote
         afterColon = false;
         continue;
+      } else if (ch === "\\") {
+        i++; // skip escaped char — \{ \} \, etc are not structural
       } else if (ch === "{") {
         depth++;
       } else if (ch === "}") {
@@ -113,9 +115,12 @@ function detectMatches(
   candidates: string[],
   utilityCss: string,
 ): { matched: Set<string>; unmatched: string[] } {
-  // Match CSS selectors — capture everything after the leading dot up to the opening brace,
-  // including spaces that are part of numeric escapes (e.g. `.\32 xl\:grid`)
-  const selectorRe = /^\s*\.((?:[^{](?!,\s*\.))*?)\s*(?:,|\{)/gm;
+  // Extract class selectors from CSS. Tailwind emits one selector per rule.
+  // Selectors may contain escaped chars: \: \[ \] \{ \} \, \/ \. \32 (numeric)
+  // Numeric escapes include a mandatory space: \32 xl means char 0x32 ('2') + 'xl'.
+  // We capture from the leading dot up to the opening brace, handling escaped
+  // characters as single units so escaped commas/braces don't terminate prematurely.
+  const selectorRe = /^\s*\.((?:\\[0-9a-fA-F]{1,6}\s?|\\.|[^{,\s])*)\s*(?:,.*?)?\s*\{/gm;
   const generated = new Set<string>();
   let m;
   while ((m = selectorRe.exec(utilityCss)) !== null) {
@@ -182,7 +187,16 @@ export async function twGenerateCSS(
   const candidates = [...tokens];
   const cacheKey = cssInput + "\0" + JSON.stringify([...tokens].sort());
   const cached = _cache.get(cacheKey);
-  if (cached) return cached;
+  if (cached) {
+    // Return a defensive copy so callers can't mutate the cache
+    return {
+      css: cached.css,
+      themeCss: cached.themeCss,
+      matched: new Set(cached.matched),
+      unmatched: [...cached.unmatched],
+      warnings: cached.warnings.map((w: Warning) => ({ ...w, location: { ...w.location } })),
+    };
+  }
 
   const compiler = await compile(cssInput, { loadStylesheet });
   const output = compiler.build(candidates);
