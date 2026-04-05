@@ -23,6 +23,21 @@ export interface ConvertOptions {
    * }
    */
   customVariants?: CustomVariantsOption;
+
+  /**
+   * CSS string containing `@theme { ... }` blocks with CSS variable declarations.
+   * These are parsed and mapped to UnoCSS theme configuration, enabling
+   * theme-defined classes (e.g., `bg-brand`) to resolve correctly.
+   *
+   * Accepts either a full `@theme { ... }` block or bare declarations.
+   *
+   * @example
+   * themeCss: `@theme {
+   *   --color-brand: #ff0000;
+   *   --spacing-huge: 10rem;
+   * }`
+   */
+  themeCss?: string;
 }
 
 export interface ConvertResult {
@@ -35,7 +50,12 @@ export interface ConvertResult {
 }
 
 export interface Warning {
-  type: "dynamic-class" | "unmatched-class";
+  type:
+    | "dynamic-class"
+    | "unmatched-class"
+    | "theme-parse-error"
+    | "unknown-theme-namespace"
+    | "unsupported-theme-reset";
   message: string;
   location: { line: number; column: number };
 }
