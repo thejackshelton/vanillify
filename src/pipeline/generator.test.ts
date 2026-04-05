@@ -193,12 +193,14 @@ describe("Codex review fixes", () => {
       new Set(["flex", "p-4", "before:content-['x']"]),
     );
 
+    // Utility rules in css, support blocks in supportCss
     expect(result.css).not.toContain("@property");
     expect(result.css).not.toContain("@layer properties");
     expect(result.css).toContain(".flex");
-    // Verify content utility is not truncated by quote handling
     expect(result.css).toContain("content-");
     expect(result.css).toContain("--tw-content");
+    // @property for --tw-content should be in supportCss
+    expect(result.supportCss).toContain("@property --tw-content");
   });
 
   it("handles arbitrary values with literal braces in content", async () => {
@@ -212,16 +214,17 @@ describe("Codex review fixes", () => {
     expect(result.css).not.toContain("@layer");
   });
 
-  it("animation utilities include @keyframes in css output", async () => {
+  it("animation utilities produce @keyframes in supportCss", async () => {
     const result = await twGenerateCSS(new Set(["flex", "animate-spin"]));
 
+    // Utility rules in css
     expect(result.css).toContain(".flex");
     expect(result.css).toContain(".animate-spin");
-    expect(result.css).toContain("@keyframes spin");
-    expect(result.css).toContain("rotate(360deg)");
-    // @property and @layer properties should still be excluded
-    expect(result.css).not.toContain("@property");
     expect(result.css).not.toContain("@layer");
     expect(result.matched).toContain("animate-spin");
+
+    // @keyframes, @property, @layer properties in supportCss (hoisted once per file)
+    expect(result.supportCss).toContain("@keyframes spin");
+    expect(result.supportCss).toContain("rotate(360deg)");
   });
 });

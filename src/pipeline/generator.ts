@@ -35,6 +35,7 @@ export const _cache: Map<string, any> = new Map();
 function extractLayers(output: string): {
   themeCss: string;
   utilityCss: string;
+  supportCss: string;
 } {
   // Theme layer regex: matches @layer theme { ... } with non-greedy [\s\S]*? and
   // positive lookahead (?=@layer) to stop before the next layer block.
@@ -42,14 +43,21 @@ function extractLayers(output: string): {
   const themeMatch = output.match(/@layer theme \{([\s\S]*?)\}\s*(?=@layer)/);
   const themeCss = themeMatch ? themeMatch[1].trim() : "";
 
-  // Utilities layer: Tailwind always emits @layer utilities { ... } as the last @layer block,
-  // optionally followed by @keyframes, @property, and/or @layer properties blocks.
+  // Tailwind build() output structure (verified against tailwindcss@4.2.2):
+  //   @layer theme { ... }
+  //   @layer base { ... }
+  //   @layer utilities { ... }
+  //   @property --tw-* { ... }      ← runtime contract for some utilities
+  //   @keyframes name { ... }       ← animation utilities
+  //   @layer properties { ... }     ← fallback for browsers without @property
   //
-  // We extract the utility rules from inside @layer utilities, PLUS any @keyframes blocks
-  // that follow (needed for animation utilities like animate-spin). We strip @property and
-  // @layer properties (browser support blocks) as they are implementation details.
+  // We extract three buckets:
+  // 1. utilityCss: inner content of @layer utilities (selector rules)
+  // 2. supportCss: everything after @layer utilities closes — @property, @keyframes,
+  //    @layer properties. These are hoisted once per output file, not per-node.
   const utilStart = output.indexOf("@layer utilities {");
   let utilityCss = "";
+  let supportCss = "";
   if (utilStart !== -1) {
     const contentStart = utilStart + "@layer utilities {".length;
 
@@ -63,18 +71,13 @@ function extractLayers(output: string): {
     const lastBrace = slice.lastIndexOf("}");
     utilityCss = lastBrace !== -1 ? slice.slice(0, lastBrace).trim() : slice.trim();
 
-    // Append @keyframes blocks that follow @layer utilities.
-    // These are required for animation utilities (animate-spin, animate-pulse, etc.)
-    // RATIONALE: stays raw -- magic-regexp lacks global/multiline flags with backrefs.
-    const postUtilities = output.slice(endBoundary + 1); // everything after @layer utilities }
-    const keyframesRe = /@keyframes\s+[\w-]+\s*\{[^}]*(?:\{[^}]*\}[^}]*)*\}/g;
-    let kfMatch;
-    while ((kfMatch = keyframesRe.exec(postUtilities)) !== null) {
-      utilityCss += "\n" + kfMatch[0];
+    // Everything after @layer utilities } is support CSS (hoisted once per file)
+    if (closeIdx !== -1) {
+      supportCss = output.slice(endBoundary + 1).trim(); // +1 to skip the \n after }
     }
   }
 
-  return { themeCss, utilityCss };
+  return { themeCss, utilityCss, supportCss };
 }
 
 // --- Unmatched detection [ENG-01] ---
@@ -136,6 +139,8 @@ export interface TwGenerateCSSResult {
   css: string;
   /** :root CSS variable definitions from theme layer */
   themeCss: string;
+  /** @property, @keyframes, @layer properties blocks — hoist once per output file */
+  supportCss: string;
   /** Tokens that successfully generated CSS */
   matched: Set<string>;
   /** Tokens that produced no CSS (coverage gaps) */
@@ -161,6 +166,7 @@ export async function twGenerateCSS(
     return {
       css: "",
       themeCss: "",
+      supportCss: "",
       matched: new Set<string>(),
       unmatched: [],
       warnings: [],
@@ -183,6 +189,7 @@ export async function twGenerateCSS(
     return {
       css: cached.css,
       themeCss: cached.themeCss,
+      supportCss: cached.supportCss,
       matched: new Set(cached.matched),
       unmatched: [...cached.unmatched],
       warnings: cached.warnings.map((w: Warning) => ({ ...w, location: { ...w.location } })),
@@ -205,7 +212,7 @@ export async function twGenerateCSS(
     const fallbackInput = '@import "tailwindcss" source(none);';
     const fallbackCompiler = await compile(fallbackInput, { loadStylesheet });
     const fallbackOutput = fallbackCompiler.build(candidates);
-    const { themeCss: fallbackTheme, utilityCss: fallbackUtility } = extractLayers(fallbackOutput);
+    const { themeCss: fallbackTheme, utilityCss: fallbackUtility, supportCss: fallbackSupport } = extractLayers(fallbackOutput);
     const { unmatched: fallbackUnmatched } = detectMatches(candidates, fallbackUtility);
     warnings.push(...fallbackUnmatched.map((token) => ({
       type: "unmatched-class" as const,
@@ -215,6 +222,7 @@ export async function twGenerateCSS(
     return {
       css: fallbackUtility,
       themeCss: fallbackTheme,
+      supportCss: fallbackSupport,
       matched: new Set(candidates.filter((c) => !fallbackUnmatched.includes(c))),
       unmatched: fallbackUnmatched,
       warnings,
@@ -223,7 +231,7 @@ export async function twGenerateCSS(
   const output = compiler.build(candidates);
 
   // Extract layers [ENG-05]
-  const { themeCss: extractedTheme, utilityCss } = extractLayers(output);
+  const { themeCss: extractedTheme, utilityCss, supportCss } = extractLayers(output);
 
   // Detect unmatched [ENG-01]
   const { matched, unmatched } = detectMatches(candidates, utilityCss);
@@ -237,15 +245,17 @@ export async function twGenerateCSS(
   const result: TwGenerateCSSResult = {
     css: utilityCss,
     themeCss: extractedTheme,
+    supportCss,
     matched,
     unmatched,
     warnings,
   };
   // Cache a defensive copy to prevent mutation poisoning.
-  // Freeze strings (css, themeCss) are immutable. Clone mutable containers.
+  // Freeze strings (css, themeCss, supportCss) are immutable. Clone mutable containers.
   _cache.set(cacheKey, {
     css: utilityCss,
     themeCss: extractedTheme,
+    supportCss,
     matched: new Set(matched),
     unmatched: [...unmatched],
     warnings: warnings.map((w) => ({ ...w, location: { ...w.location } })),

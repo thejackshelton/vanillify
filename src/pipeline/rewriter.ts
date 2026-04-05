@@ -55,6 +55,7 @@ export async function rewrite(
   const allWarnings: Warning[] = [...extractWarnings];
   const cssBlocks: string[] = [];
   let resultThemeCss = "";
+  let resultSupportCss = "";
 
   // Generate CSS per-node to get isolated CSS blocks
   for (const entry of entries) {
@@ -68,10 +69,13 @@ export async function rewrite(
     // Collect unmatched warnings
     allWarnings.push(...result.warnings);
 
-    // Collect themeCss from the first call that returns non-empty themeCss
-    // (theme layer is the same across all nodes since it comes from the compiler's theme config)
+    // Collect themeCss and supportCss from the first call that returns non-empty values
+    // (these are the same across all nodes since they come from the compiler config)
     if (!resultThemeCss && result.themeCss) {
       resultThemeCss = result.themeCss;
+    }
+    if (!resultSupportCss && result.supportCss) {
+      resultSupportCss = result.supportCss;
     }
 
     // Rewrite top-level selectors to .nodeN and merge plain declarations
@@ -114,7 +118,12 @@ export async function rewrite(
     }
   }
 
-  const outputCss = cssBlocks.join("\n\n");
+  // Combine: per-node utility CSS blocks + support CSS (hoisted once per file)
+  // Support CSS includes @property, @keyframes, @layer properties — needed for
+  // animation utilities, content-['x'], space-x-4, etc. to work correctly.
+  const parts = [cssBlocks.join("\n\n")];
+  if (resultSupportCss) parts.push(resultSupportCss);
+  const outputCss = parts.filter(Boolean).join("\n\n");
 
   return { component, css: outputCss, themeCss: resultThemeCss, warnings: allWarnings, classMap };
 }
