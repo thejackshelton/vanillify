@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect } from 'vite-plus/test'
 import { rewrite } from './rewriter'
 import { parse } from './parser'
 import { extract } from './extractor'

@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach } from 'vitest'
+import { describe, it, expect, beforeEach } from 'vite-plus/test'
 import { generateCSS, getGenerator, resetGenerator } from './generator'
 import { createVariantObject } from '../variants/resolver'
 
