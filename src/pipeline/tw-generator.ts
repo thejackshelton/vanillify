@@ -40,55 +40,29 @@ function extractLayers(output: string): {
   const themeMatch = output.match(/@layer theme \{([\s\S]*?)\}\s*(?=@layer)/);
   const themeCss = themeMatch ? themeMatch[1].trim() : "";
 
-  // Utilities layer: extract content between @layer utilities { and its matching close brace.
-  // Tailwind output structure: @layer theme { ... } @layer utilities { ... } [@property ...] [@layer properties { ... }]
-  // The @property and @layer properties blocks appear AFTER @layer utilities closes.
-  //
-  // Strategy: find @layer utilities { content } by scanning backwards from the end of
-  // the output to find where @layer utilities content ends. Since Tailwind always emits
-  // @layer utilities as the last @layer block, we find its opening and then locate its
-  // matching close brace using depth counting. We avoid treating escaped quotes in
-  // selectors (e.g. \['x'\]) as string delimiters by only recognizing quotes that
-  // appear after a colon (i.e., in CSS property values, not selectors).
+  // Utilities layer: Tailwind always emits @layer utilities { ... } as the last @layer block,
+  // optionally followed by @property and/or @layer properties blocks on new lines.
+  // Rather than parsing CSS braces (which is fragile with escaped chars, quoted values, etc.),
+  // we find the boundary by locating the first post-utilities directive and scanning backwards
+  // to find the closing } of @layer utilities.
   const utilStart = output.indexOf("@layer utilities {");
   let utilityCss = "";
   if (utilStart !== -1) {
     const contentStart = utilStart + "@layer utilities {".length;
-    let depth = 1;
-    let i = contentStart;
-    let afterColon = false;
-    while (i < output.length && depth > 0) {
-      const ch = output[i];
-      // Only unescaped colons signal property values; escaped colons (\:) are selector chars
-      if (ch === ":" && (i === 0 || output[i - 1] !== "\\")) {
-        afterColon = true;
-      } else if (ch === ";" || ch === "\n") {
-        afterColon = false;
-      }
-      // Only treat quotes as string delimiters in property values (after colon),
-      // not in selectors where \['x'\] contains literal quote escapes
-      if (afterColon && (ch === '"' || ch === "'")) {
-        const quote = ch;
-        i++;
-        while (i < output.length && output[i] !== quote) {
-          if (output[i] === "\\") i++;
-          i++;
-        }
-        i++; // skip closing quote
-        // Stay in afterColon mode — multiple quoted fragments in one value
-        // (e.g. --tw-content: "}" "{") are all part of the same declaration
-        continue;
-      } else if (ch === "\\") {
-        i++; // skip escaped char — \{ \} \, etc are not structural
-      } else if (ch === "{") {
-        depth++;
-      } else if (ch === "}") {
-        depth--;
-      }
-      i++;
+
+    // Find where post-utilities blocks begin (if any)
+    // These always start at column 0 on a new line after @layer utilities closes
+    const postUtilPatterns = ["\n@property ", "\n@property\t", "\n@layer properties"];
+    let endBoundary = output.length;
+    for (const pat of postUtilPatterns) {
+      const idx = output.indexOf(pat, contentStart);
+      if (idx !== -1 && idx < endBoundary) endBoundary = idx;
     }
-    // i now points past the matching }, content is between contentStart and i-1
-    utilityCss = output.slice(contentStart, i - 1).trim();
+
+    // The closing } of @layer utilities is the last } before the endBoundary
+    const slice = output.slice(contentStart, endBoundary);
+    const lastBrace = slice.lastIndexOf("}");
+    utilityCss = lastBrace !== -1 ? slice.slice(0, lastBrace).trim() : slice.trim();
   }
 
   return { themeCss, utilityCss };
