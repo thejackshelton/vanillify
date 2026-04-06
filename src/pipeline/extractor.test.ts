@@ -155,6 +155,27 @@ describe("extract", () => {
     expect(unresolvableContainers?.size).toBe(1);
   });
 
+  it("flags || fallback with variable left side as unresolvable (DYN-08)", () => {
+    const source = 'const A = () => <div className={myVar || "flex"}>hi</div>';
+    const { program } = parse("test.tsx", source);
+    const { entries, unresolvableContainers } = extract(program, source);
+
+    expect(entries).toHaveLength(1);
+    expect(entries[0].classNames).toEqual(["flex"]);
+    // myVar is a class value position in ||, so container is unresolvable
+    expect(unresolvableContainers?.size).toBe(1);
+  });
+
+  it("flags ?? fallback with variable left side as unresolvable (DYN-08)", () => {
+    const source = 'const A = () => <div className={myVar ?? "flex"}>hi</div>';
+    const { program } = parse("test.tsx", source);
+    const { entries, unresolvableContainers } = extract(program, source);
+
+    expect(entries).toHaveLength(1);
+    expect(entries[0].classNames).toEqual(["flex"]);
+    expect(unresolvableContainers?.size).toBe(1);
+  });
+
   it("extracts fragments from clsx call arguments (DYN-01)", () => {
     const source = 'const A = () => <div className={clsx("flex", cond && "gap-4")}>hi</div>';
     const { program } = parse("test.tsx", source);

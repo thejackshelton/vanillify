@@ -173,9 +173,13 @@ function expressionHasUnresolvable(expression: any): boolean {
   }
 
   if (expression.type === "LogicalExpression") {
-    // left side of && / || is a condition, not a class value -- don't count it
-    // right side may carry a class value
-    return expressionHasUnresolvable(expression.right);
+    // For &&: left is a condition, right is the class value
+    // For || and ??: both sides are class value positions (fallback pattern)
+    if (expression.operator === "&&") {
+      return expressionHasUnresolvable(expression.right);
+    }
+    return expressionHasUnresolvable(expression.left) ||
+           expressionHasUnresolvable(expression.right);
   }
 
   if (expression.type === "CallExpression") {
