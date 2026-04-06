@@ -40,12 +40,15 @@ describe("rewrite", () => {
     expect(result.css).toContain("padding");
   });
 
-  it("leaves dynamic className expressions unchanged in source", async () => {
+  it("rewrites string literal fragments from ternary expressions", async () => {
     const source = '<div className={active ? "bg-blue-500" : "bg-gray-500"}>hi</div>';
     const result = await rewriteFromSource(source);
 
-    // Dynamic expressions should remain unchanged
-    expect(result.component).toContain('active ? "bg-blue-500" : "bg-gray-500"');
+    // Fragment entries are rewritten to indexed names
+    expect(result.component).toContain('"node0"');
+    expect(result.component).toContain('"node1"');
+    // The ternary structure itself remains but string literals are replaced
+    expect(result.component).toContain('active ?');
   });
 
   it("handles multiple nodes with separate CSS blocks", async () => {
@@ -257,11 +260,14 @@ describe("rewrite with css-modules format", () => {
     expect(modules.css).toBe(vanilla.css);
   });
 
-  it("leaves dynamic className expressions unchanged", async () => {
+  it("rewrites string literal fragments from ternary expressions", async () => {
     const source = '<div className={active ? "bg-blue-500" : "bg-gray-500"}>hi</div>';
     const result = await rewriteFromSource(source, "test.tsx", undefined, "css-modules");
 
-    expect(result.component).toContain('active ? "bg-blue-500" : "bg-gray-500"');
+    // Fragment entries are rewritten to indexed CSS module references
+    expect(result.component).toContain('styles.node0');
+    expect(result.component).toContain('styles.node1');
+    expect(result.component).toContain('active ?');
   });
 
   it("returns classMap in result", async () => {

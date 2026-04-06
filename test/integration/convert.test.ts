@@ -70,7 +70,7 @@ const Custom = () => (
     expect(result.css).toContain("width");
   });
 
-  it("detects dynamic class expressions and warns", async () => {
+  it("rewrites string literal fragments in ternary className expressions", async () => {
     const source = `
 const Toggle = () => (
   <div className={active ? "bg-blue-500" : "bg-gray-500"}>toggle</div>
@@ -78,9 +78,10 @@ const Toggle = () => (
 `;
     const result = await convert(source, "toggle.tsx");
 
-    // Dynamic entry should trigger a warning
-    const dynamicWarnings = result.warnings.filter((w) => w.type === "dynamic-class");
-    expect(dynamicWarnings.length).toBeGreaterThanOrEqual(1);
+    // Fragment entries are rewritten to indexed names; no dynamic-class warning from extractor
+    expect(result.component).toContain("node0");
+    expect(result.component).toContain("node1");
+    expect(result.warnings.filter((w) => w.type === "dynamic-class")).toHaveLength(0);
   });
 
   it("handles the class attribute (Qwik/Solid style)", async () => {

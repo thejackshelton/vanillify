@@ -103,11 +103,13 @@ describe("API backward compatibility (Phase 11)", () => {
     ).toBe(true);
   });
 
-  it("dynamic class produces warning", async () => {
+  it("dynamic ternary class expressions are rewritten to indexed names", async () => {
     const result = await convert(DYNAMIC_JSX, "test.tsx");
 
-    expect(
-      result.warnings.some((w) => w.type === "dynamic-class"),
-    ).toBe(true);
+    // String literal fragments inside ternary are now rewritten, not warned about
+    expect(result.component).toContain("node0");
+    expect(result.component).toContain("node1");
+    // No dynamic-class warning emitted by extractor (warnings deferred to rewriter in Plan 02)
+    expect(result.warnings.some((w) => w.type === "dynamic-class")).toBe(false);
   });
 });

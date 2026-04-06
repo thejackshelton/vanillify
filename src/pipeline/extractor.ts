@@ -8,6 +8,16 @@ const WS_RE = createRegExp(oneOrMore(whitespace));
 export interface ExtractResult {
   entries: NodeEntry[];
   warnings: Warning[];
+  /** Maps containerStart -> boolean indicating if container has unresolvable sub-expressions */
+  unresolvableContainers?: Map<number, boolean>;
+}
+
+/**
+ * A single string literal fragment found inside a dynamic expression.
+ */
+interface Fragment {
+  value: string;
+  span: { start: number; end: number };
 }
 
 /**
@@ -17,11 +27,12 @@ export interface ExtractResult {
  *
  * @param program - ESTree Program node from oxc-parser
  * @param source - Original source string (for computing line/column from offset)
- * @returns ExtractResult with entries and warnings
+ * @returns ExtractResult with entries, warnings, and unresolvableContainers
  */
 export function extract(program: any, source: string): ExtractResult {
   const entries: NodeEntry[] = [];
   const warnings: Warning[] = [];
+  const unresolvableContainers = new Map<number, boolean>();
   let nodeIndex = 0;
 
   walk(program, {
@@ -42,65 +53,115 @@ export function extract(program: any, source: string): ExtractResult {
             isDynamic: false,
           });
         } else if (node.value?.type === "JSXExpressionContainer") {
-          // Dynamic expression -- extract what we can, mark as dynamic
-          const fragments = extractStaticFragments(node.value.expression);
-          const loc = offsetToLineColumn(source, node.value.start);
-          entries.push({
-            nodeIndex: nodeIndex++,
-            classNames: fragments,
-            span: { start: node.value.start, end: node.value.end },
-            isDynamic: true,
-          });
-          warnings.push({
-            type: "dynamic-class",
-            message: `Dynamic class expression at ${loc.line}:${loc.column} — extracted ${fragments.length} static fragments`,
-            location: loc,
-          });
+          const expression = node.value.expression;
+          const containerStart = node.value.start;
+
+          const hasUnresolvable = expressionHasUnresolvable(expression);
+          if (hasUnresolvable) {
+            unresolvableContainers.set(containerStart, true);
+          }
+
+          const fragments = collectFragments(expression);
+          for (const frag of fragments) {
+            const tokens = frag.value.split(WS_RE).filter(Boolean);
+            if (tokens.length === 0) continue; // DYN-04: skip empty/whitespace
+
+            entries.push({
+              nodeIndex: nodeIndex++,
+              classNames: tokens,
+              span: frag.span,
+              isDynamic: false,
+              isFragment: true,
+              containerStart,
+            });
+          }
         }
       }
     },
   });
 
-  return { entries, warnings };
+  return { entries, warnings, unresolvableContainers };
 }
 
 /**
- * Attempt to extract string literal fragments from dynamic expressions.
- * Handles: ternary branches, logical AND right-hand side, template literal quasis.
- * Returns class tokens found in static parts.
+ * Recursively collect string Literal fragments from a dynamic expression.
+ * Returns one Fragment per string literal node found.
  *
- * T-01-04: Returns empty array for unrecognized node types -- never throws.
+ * Handles: Literal, ConditionalExpression, LogicalExpression, CallExpression.
+ * All other node types (Identifier, MemberExpression, TemplateLiteral with
+ * interpolations, SpreadElement, etc.) are unresolvable and return no fragments.
  */
-function extractStaticFragments(expression: any): string[] {
-  const fragments: string[] = [];
+function collectFragments(expression: any): Fragment[] {
+  const results: Fragment[] = [];
+  if (!expression) return results;
 
-  if (!expression) return fragments;
-
-  // String literal (ESTree 'Literal' with string value): className={"flex bg-red-500"}
+  // String literal leaf -- the rewritable unit
   if (expression.type === "Literal" && typeof expression.value === "string") {
-    fragments.push(...expression.value.split(WS_RE).filter(Boolean));
+    results.push({ value: expression.value, span: { start: expression.start, end: expression.end } });
+    return results;
   }
-  // Ternary: className={cond ? "a b" : "c d"}
-  else if (expression.type === "ConditionalExpression") {
-    fragments.push(...extractStaticFragments(expression.consequent));
-    fragments.push(...extractStaticFragments(expression.alternate));
-  }
-  // Logical AND: className={cond && "a b"}
-  else if (expression.type === "LogicalExpression") {
-    fragments.push(...extractStaticFragments(expression.right));
-  }
-  // Template literal: className={`flex ${var}`} -- extract static quasis
-  else if (expression.type === "TemplateLiteral") {
-    for (const quasi of expression.quasis ?? []) {
-      if (quasi.value?.cooked) {
-        fragments.push(...quasi.value.cooked.split(WS_RE).filter(Boolean));
-      }
-    }
-  }
-  // CallExpression, MemberExpression, etc. -- unrecognized, return empty
-  // This is intentional: function calls like clsx() can't be statically analyzed
 
-  return fragments;
+  // Ternary: recurse both branches
+  if (expression.type === "ConditionalExpression") {
+    results.push(...collectFragments(expression.consequent));
+    results.push(...collectFragments(expression.alternate));
+    return results;
+  }
+
+  // Logical AND / OR / nullish coalescing: recurse both sides
+  if (expression.type === "LogicalExpression") {
+    results.push(...collectFragments(expression.left));
+    results.push(...collectFragments(expression.right));
+    return results;
+  }
+
+  // Function call (clsx, cn, etc.): recurse into each argument
+  if (expression.type === "CallExpression") {
+    for (const arg of expression.arguments ?? []) {
+      results.push(...collectFragments(arg));
+    }
+    return results;
+  }
+
+  // All other types (Identifier, MemberExpression, SpreadElement, TemplateLiteral, etc.)
+  // are unresolvable -- return empty
+  return results;
+}
+
+/**
+ * Determine whether an expression contains any unresolvable (non-Literal)
+ * nodes in class-value positions.
+ *
+ * Note: The `test` of a ConditionalExpression and the `left` of a
+ * LogicalExpression are conditions, not class values -- they are not counted.
+ */
+function expressionHasUnresolvable(expression: any): boolean {
+  if (!expression) return false;
+
+  if (expression.type === "Literal" && typeof expression.value === "string") {
+    return false;
+  }
+
+  if (expression.type === "ConditionalExpression") {
+    // test is a condition, not a class value -- don't count it
+    return expressionHasUnresolvable(expression.consequent) ||
+           expressionHasUnresolvable(expression.alternate);
+  }
+
+  if (expression.type === "LogicalExpression") {
+    // left side of && / || is a condition, not a class value -- don't count it
+    // right side may carry a class value
+    return expressionHasUnresolvable(expression.right);
+  }
+
+  if (expression.type === "CallExpression") {
+    // callee is the function, not a class value -- only recurse arguments
+    return (expression.arguments ?? []).some((arg: any) => expressionHasUnresolvable(arg));
+  }
+
+  // Identifier, MemberExpression, TemplateLiteral with interpolations, SpreadElement, etc.
+  // in a class-value position -- unresolvable
+  return true;
 }
 
 /**
