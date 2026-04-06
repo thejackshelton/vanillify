@@ -340,3 +340,67 @@ describe("convert() css-modules integration", () => {
     expect(result.classMap).toBeUndefined();
   });
 });
+
+// Phase 2: DYN-05 replacement value tests
+
+describe("rewrite object key and CSS Modules replacement values (DYN-05)", () => {
+  it("DYN-05 object key vanilla: rewrites quoted key to bare name", async () => {
+    const source = 'const A = () => <div className={clsx({ "flex gap-4": cond })}>hi</div>';
+    const result = await rewriteFromSource(source);
+
+    // Bare name (no quotes) replaces the key
+    expect(result.component).toContain("node0");
+    expect(result.component).not.toContain("flex gap-4");
+  });
+
+  it("DYN-05 object key css-modules: rewrites quoted key to [styles.nodeN]", async () => {
+    const source = 'const A = () => <div className={clsx({ "flex gap-4": cond })}>hi</div>';
+    const result = await rewriteFromSource(source, "test.tsx", undefined, "css-modules");
+
+    expect(result.component).toContain("[styles.node0]");
+    expect(result.component).not.toContain("flex gap-4");
+  });
+
+  it("DYN-05 unquoted key vanilla: rewrites identifier key to bare name", async () => {
+    const source = 'const A = () => <div className={clsx({ hidden: cond })}>hi</div>';
+    const result = await rewriteFromSource(source);
+
+    expect(result.component).toContain("node0");
+    expect(result.component).not.toContain(": hidden");
+  });
+
+  it("DYN-05 unquoted key css-modules: rewrites identifier key to [styles.nodeN]", async () => {
+    const source = 'const A = () => <div className={clsx({ hidden: cond })}>hi</div>';
+    const result = await rewriteFromSource(source, "test.tsx", undefined, "css-modules");
+
+    expect(result.component).toContain("[styles.node0]");
+    expect(result.component).not.toContain(": hidden");
+  });
+
+  it("DYN-05a fragment expression css-modules fix: no curly braces around styles.nodeN in expression", async () => {
+    const source = '<div className={active ? "flex" : "hidden"}>hi</div>';
+    const result = await rewriteFromSource(source, "test.tsx", undefined, "css-modules");
+
+    // Must NOT have {styles.node0} (object literal form) in ternary context
+    expect(result.component).not.toMatch(/\{styles\.node\d+\}/);
+    expect(result.component).toContain("styles.node0");
+    expect(result.component).toContain("styles.node1");
+  });
+
+  it("DYN-05 static attribute css-modules: still uses {styles.nodeN} with braces", async () => {
+    const source = '<div className="flex p-4">hi</div>';
+    const result = await rewriteFromSource(source, "test.tsx", undefined, "css-modules");
+
+    expect(result.component).toContain("{styles.node0}");
+  });
+
+  it("DYN-05 mixed: object keys use object-key format, fragments use expression format", async () => {
+    const source = 'const A = () => <div className={clsx("flex", { hidden: cond })}>hi</div>';
+    const cssModulesResult = await rewriteFromSource(source, "test.tsx", undefined, "css-modules");
+
+    // "flex" is a fragment -> styles.node0 (no braces)
+    expect(cssModulesResult.component).toContain("styles.node0");
+    // "hidden" is an object key -> [styles.node1]
+    expect(cssModulesResult.component).toContain("[styles.node1]");
+  });
+});

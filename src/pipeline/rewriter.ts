@@ -23,6 +23,31 @@ export interface RewriteResult {
 }
 
 /**
+ * Build the replacement value string for a single NodeEntry.
+ *
+ * Three cases (checked in priority order):
+ * 1. isObjectKey  — object property key position: bare name or [styles.name]
+ * 2. isFragment   — expression position inside JSX container: name or styles.name (no braces)
+ * 3. static attr  — className="..." position: "name" or {styles.name}
+ *
+ * CRITICAL: isObjectKey is checked before isFragment because object key entries
+ * also have isFragment=true (they are fragments inside a container).
+ */
+function buildReplacementValue(name: string, isCSSModules: boolean, entry: NodeEntry): string {
+  if (entry.isObjectKey) {
+    // Object key position: { "flex gap-4": cond } -> { node0: cond } or { [styles.node0]: cond }
+    return isCSSModules ? `[styles.${name}]` : name;
+  }
+  if (entry.isFragment) {
+    // Expression position inside JSX container: "flex" -> styles.node0 or "node0"
+    // No curly braces -- the containing expression already provides the JS context
+    return isCSSModules ? `styles.${name}` : `"${name}"`;
+  }
+  // Static JSX string attribute: className="flex p-4" -> className={styles.node0} or className="node0"
+  return isCSSModules ? `{styles.${name}}` : `"${name}"`;
+}
+
+/**
  * Rewrite the source component and assemble per-node CSS.
  *
  * For each static entry:
@@ -140,7 +165,7 @@ export async function rewrite(
       const name = nameMap.get(e.nodeIndex)!;
       return {
         span: e.span,
-        newValue: isCSSModules ? `{styles.${name}}` : `"${name}"`,
+        newValue: buildReplacementValue(name, isCSSModules, e),
       };
     })
     .sort((a, b) => b.span.start - a.span.start);
