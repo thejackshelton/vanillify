@@ -35,7 +35,13 @@ export interface RewriteResult {
  */
 function buildReplacementValue(name: string, isCSSModules: boolean, entry: NodeEntry): string {
   if (entry.isObjectKey) {
-    // Object key position: { "flex gap-4": cond } -> { node0: cond } or { [styles.node0]: cond }
+    // Shorthand property: { hidden } -> { node0: hidden } or { [styles.node0]: hidden }
+    if (entry.shorthandOriginal) {
+      return isCSSModules
+        ? `[styles.${name}]: ${entry.shorthandOriginal}`
+        : `${name}: ${entry.shorthandOriginal}`;
+    }
+    // Quoted/unquoted key: { "flex gap-4": cond } -> { node0: cond } or { [styles.node0]: cond }
     return isCSSModules ? `[styles.${name}]` : name;
   }
   if (entry.isFragment) {

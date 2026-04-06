@@ -378,10 +378,18 @@ describe("object key and CSS Modules rewriting (Phase 2)", () => {
     expect(result.component).not.toContain('"flex"');
   });
 
-  it("rewrites shorthand property key in clsx call", async () => {
+  it("rewrites shorthand property key in clsx call (expands shorthand)", async () => {
     const source = `const A = () => <div className={clsx({ hidden })}>hi</div>`;
     const result = await convert(source, "test.tsx");
-    expect(result.component).toContain("node0");
+    // Shorthand { hidden } must expand to { node0: hidden } to avoid referencing node0 variable
+    expect(result.component).toContain("node0: hidden");
     expect(result.css).toContain(".node0");
+  });
+
+  it("rewrites shorthand property in CSS Modules mode (expands with computed key)", async () => {
+    const source = `const A = () => <div className={clsx({ hidden })}>hi</div>`;
+    const result = await convert(source, "test.tsx", { outputFormat: "css-modules" });
+    // Shorthand { hidden } must expand to { [styles.node0]: hidden }
+    expect(result.component).toContain("[styles.node0]: hidden");
   });
 });

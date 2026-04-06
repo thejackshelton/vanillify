@@ -56,4 +56,6 @@ export interface NodeEntry {
   containerStart?: number;
   /** Whether this fragment is an object property key (for clsx/cn-style conditionals) */
   isObjectKey?: boolean;
+  /** Original identifier name for shorthand properties like { hidden } — rewriter expands to { newKey: hidden } */
+  shorthandOriginal?: string;
 }

@@ -19,6 +19,8 @@ interface Fragment {
   value: string;
   span: { start: number; end: number };
   isObjectKey?: boolean;
+  /** Original identifier name for shorthand properties like { hidden } */
+  shorthandOriginal?: string;
 }
 
 /**
@@ -75,6 +77,7 @@ export function extract(program: any, source: string): ExtractResult {
               isFragment: true,
               containerStart,
               isObjectKey: frag.isObjectKey,
+              shorthandOriginal: frag.shorthandOriginal,
             });
           }
         }
@@ -156,7 +159,11 @@ function collectFragments(expression: any): Fragment[] {
       } else {
         continue;
       }
-      results.push({ value, span, isObjectKey: true });
+      const frag: Fragment = { value, span, isObjectKey: true };
+      if (prop.shorthand) {
+        frag.shorthandOriginal = key.name;
+      }
+      results.push(frag);
     }
     return results;
   }
