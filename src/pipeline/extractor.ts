@@ -108,6 +108,11 @@ function collectFragments(expression: any): Fragment[] {
     return collectFragments(expression.expression);
   }
 
+  // Non-string literals (boolean, null, number) are harmless no-ops in className -- skip silently
+  if (expression.type === "Literal" && typeof expression.value !== "string") {
+    return results;
+  }
+
   // String literal leaf -- the rewritable unit
   if (expression.type === "Literal" && typeof expression.value === "string") {
     results.push({ value: expression.value, span: { start: expression.start, end: expression.end } });
@@ -138,6 +143,14 @@ function collectFragments(expression: any): Fragment[] {
   if (expression.type === "CallExpression") {
     for (const arg of expression.arguments ?? []) {
       results.push(...collectFragments(arg));
+    }
+    return results;
+  }
+
+  // Array expression: recurse into each element (clsx(["flex", cond && "hidden"]))
+  if (expression.type === "ArrayExpression") {
+    for (const elem of expression.elements ?? []) {
+      if (elem) results.push(...collectFragments(elem));
     }
     return results;
   }
@@ -191,7 +204,8 @@ function expressionHasUnresolvable(expression: any): boolean {
     return expressionHasUnresolvable(expression.expression);
   }
 
-  if (expression.type === "Literal" && typeof expression.value === "string") {
+  // All literals (string, boolean, null, number) are not unresolvable
+  if (expression.type === "Literal") {
     return false;
   }
 
@@ -214,6 +228,10 @@ function expressionHasUnresolvable(expression: any): boolean {
   if (expression.type === "CallExpression") {
     // callee is the function, not a class value -- only recurse arguments
     return (expression.arguments ?? []).some((arg: any) => expressionHasUnresolvable(arg));
+  }
+
+  if (expression.type === "ArrayExpression") {
+    return (expression.elements ?? []).some((elem: any) => elem && expressionHasUnresolvable(elem));
   }
 
   if (expression.type === "ObjectExpression") {

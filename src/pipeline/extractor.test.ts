@@ -206,6 +206,27 @@ describe("extract", () => {
     expect(entries[0].classNames).toEqual(["gap-4"]);
   });
 
+  it("extracts fragments from array arguments in clsx call", () => {
+    const source = 'const A = () => <div className={clsx(["flex", cond && "hidden"])}>hi</div>';
+    const { program } = parse("test.tsx", source);
+    const { entries } = extract(program, source);
+
+    expect(entries).toHaveLength(2);
+    expect(entries[0].classNames).toEqual(["flex"]);
+    expect(entries[1].classNames).toEqual(["hidden"]);
+  });
+
+  it("does not flag non-string literals (boolean, null) as unresolvable", () => {
+    const source = 'const A = () => <div className={"flex" || false}>hi</div>';
+    const { program } = parse("test.tsx", source);
+    const { entries, unresolvableContainers } = extract(program, source);
+
+    expect(entries).toHaveLength(1);
+    expect(entries[0].classNames).toEqual(["flex"]);
+    // false is not unresolvable — no warning needed
+    expect(unresolvableContainers?.size).toBe(0);
+  });
+
   it("extracts fragments from clsx call arguments (DYN-01)", () => {
     const source = 'const A = () => <div className={clsx("flex", cond && "gap-4")}>hi</div>';
     const { program } = parse("test.tsx", source);
