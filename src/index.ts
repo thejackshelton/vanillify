@@ -29,7 +29,7 @@ export async function convert(
   const { program } = parse(filename, source);
 
   // 2. Extract class entries from AST
-  const { entries, warnings: extractWarnings } = extract(program, source);
+  const { entries, warnings: extractWarnings, unresolvableContainers } = extract(program, source);
 
   // 3. Assign indexed class names
   const nameMap = assignNames(entries);
@@ -38,7 +38,7 @@ export async function convert(
   // Pass raw CSS string directly — Tailwind handles @theme and @custom-variant natively
   const result = await rewrite(
     source, entries, nameMap, extractWarnings,
-    options?.css, options?.outputFormat, filename,
+    options?.css, options?.outputFormat, filename, unresolvableContainers,
   );
 
   return {

@@ -167,7 +167,7 @@ function expressionHasUnresolvable(expression: any): boolean {
 /**
  * Convert a byte offset to line:column position in source.
  */
-function offsetToLineColumn(source: string, offset: number): { line: number; column: number } {
+export function offsetToLineColumn(source: string, offset: number): { line: number; column: number } {
   let line = 1;
   let column = 0;
   for (let i = 0; i < offset && i < source.length; i++) {

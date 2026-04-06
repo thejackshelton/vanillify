@@ -2,6 +2,7 @@ import { createRegExp, exactly, maybe } from "magic-regexp";
 import type { NodeEntry, OutputFormat, Warning } from "../types";
 import type { NameMap } from "./namer";
 import { twGenerateCSS } from "./generator";
+import { offsetToLineColumn } from "./extractor";
 
 /** Matches .ts, .tsx, .js, .jsx file extensions at end of string */
 const FILE_EXT_RE = createRegExp(
@@ -51,11 +52,15 @@ export async function rewrite(
   css?: string,
   outputFormat?: OutputFormat,
   filename?: string,
+  unresolvableContainers?: Map<number, boolean>,
 ): Promise<RewriteResult> {
   const allWarnings: Warning[] = [...extractWarnings];
   const cssBlocks: string[] = [];
   let resultThemeCss = "";
   let resultSupportCss = "";
+
+  // Track fragment entries that produced zero Tailwind matches (DYN-07: skip replacement)
+  const skippedFragments = new Set<number>();
 
   // Generate CSS per-node to get isolated CSS blocks
   for (const entry of entries) {
@@ -65,6 +70,16 @@ export async function rewrite(
 
     const tokens = new Set(entry.classNames);
     const result = await twGenerateCSS(tokens, css);
+
+    // DYN-07: skip replacement for zero-match fragments (no Tailwind CSS generated)
+    if (result.matched.size === 0) {
+      if (entry.isFragment && entry.containerStart !== undefined) {
+        skippedFragments.add(entry.nodeIndex);
+      }
+      // Still collect unmatched warnings
+      allWarnings.push(...result.warnings);
+      continue; // Do not generate CSS or replacement for this entry
+    }
 
     // Collect unmatched warnings
     allWarnings.push(...result.warnings);
@@ -85,11 +100,42 @@ export async function rewrite(
     }
   }
 
+  // DYN-08: Per-container warning contract
+  // Emit one warning per container that has unresolvable parts AND at least one replaced fragment
+  if (unresolvableContainers) {
+    // Group fragment entries by containerStart to count totals and replacements
+    const containerFragments = new Map<number, { total: number; replaced: number }>();
+    for (const entry of entries) {
+      if (entry.isFragment && entry.containerStart !== undefined) {
+        const stats = containerFragments.get(entry.containerStart) ?? { total: 0, replaced: 0 };
+        stats.total++;
+        if (!skippedFragments.has(entry.nodeIndex)) {
+          stats.replaced++;
+        }
+        containerFragments.set(entry.containerStart, stats);
+      }
+    }
+
+    // Emit warning for containers with unresolvable parts that had at least one replacement
+    for (const [containerStart, hasUnresolvable] of unresolvableContainers) {
+      if (!hasUnresolvable) continue;
+      const stats = containerFragments.get(containerStart);
+      if (stats && stats.replaced > 0) {
+        const loc = offsetToLineColumn(source, containerStart);
+        allWarnings.push({
+          type: "dynamic-class",
+          message: `Partially rewritten className at ${loc.line}:${loc.column} — ${stats.replaced} fragment(s) rewritten, variable references remain`,
+          location: loc,
+        });
+      }
+    }
+  }
+
   // Rewrite source -- replace className values with indexed names
   // Sort replacements in reverse order to avoid offset drift
   const isCSSModules = outputFormat === 'css-modules';
   const replacements = entries
-    .filter((e) => !e.isDynamic && nameMap.has(e.nodeIndex))
+    .filter((e) => !e.isDynamic && nameMap.has(e.nodeIndex) && !skippedFragments.has(e.nodeIndex))
     .map((e) => {
       const name = nameMap.get(e.nodeIndex)!;
       return {
