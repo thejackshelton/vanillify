@@ -54,6 +54,59 @@ function buildReplacementValue(name: string, isCSSModules: boolean, entry: NodeE
 }
 
 /**
+ * Remove unused tailwind-merge import lines from rewritten component source.
+ *
+ * After twMerge call spans have been replaced, checks whether any local name
+ * in twMergeNames still appears at a word boundary in the source (excluding the
+ * import line itself). If no references remain, the import line is removed.
+ *
+ * Line-based approach is used since span offsets have shifted after prior replacements.
+ *
+ * Per TMR-03: handles both direct and aliased imports.
+ * Per Pitfall 3: guards trailing newline removal to avoid leaving blank lines.
+ *
+ * @param source - Rewritten component source (after span replacements)
+ * @param twMergeNames - Set of local names bound to twMerge from "tailwind-merge"
+ * @returns Source with unused tailwind-merge import line removed (if applicable)
+ */
+function removeUnusedTwMergeImport(source: string, twMergeNames: Set<string>): string {
+  const lines = source.split('\n');
+  const importLineIdx = lines.findIndex(
+    (line) =>
+      line.includes('tailwind-merge') &&
+      line.trimStart().startsWith('import ')
+  );
+
+  if (importLineIdx === -1) return source; // No tailwind-merge import found
+
+  const importLine = lines[importLineIdx];
+
+  // Build source without the import line to check remaining references
+  const withoutImport = lines
+    .filter((_, idx) => idx !== importLineIdx)
+    .join('\n');
+
+  // Check if any twMergeNames local identifier is still referenced outside the import
+  const isStillUsed = [...twMergeNames].some((localName) => {
+    const wordBoundaryRe = new RegExp(`\\b${localName}\\b`);
+    return wordBoundaryRe.test(withoutImport);
+  });
+
+  if (isStillUsed) return source; // Keep import — still referenced elsewhere
+
+  // Remove import line; also remove the following blank line if the import line
+  // was followed by an empty line (avoids leaving double blank lines)
+  lines.splice(importLineIdx, 1);
+
+  // If removal left a leading blank line at the top of the file, remove it too
+  if (importLineIdx === 0 && lines[0] === '') {
+    lines.splice(0, 1);
+  }
+
+  return lines.join('\n');
+}
+
+/**
  * Rewrite the source component and assemble per-node CSS.
  *
  * For each static entry:
@@ -180,6 +233,12 @@ export async function rewrite(
   let component = source;
   for (const { span, newValue } of replacements) {
     component = component.slice(0, span.start) + newValue + component.slice(span.end);
+  }
+
+  // TMR-03: Remove unused tailwind-merge import after all span replacements
+  // Must happen after replacements (twMerge calls replaced) but before CSS Modules import insertion
+  if (twMergeNames && twMergeNames.size > 0) {
+    component = removeUnusedTwMergeImport(component, twMergeNames);
   }
 
   // Insert CSS Modules import statement
