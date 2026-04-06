@@ -168,11 +168,89 @@ The CLI outputs `.vanilla.css` and `.vanilla.tsx` (or `.vanilla.jsx`) files, pre
 Vanillify runs a four-step pipeline:
 
 1. **Parse** - JSX/TSX source is parsed into an AST using [oxc-parser](https://oxc.rs/) (Rust-powered, the same parser behind Rolldown)
-2. **Extract** - `className` and `class` attribute values are extracted by walking the AST with [oxc-walker](https://www.npmjs.com/package/oxc-walker). Dynamic expressions are flagged as warnings.
+2. **Extract** - `className` and `class` attribute values are extracted by walking the AST with [oxc-walker](https://www.npmjs.com/package/oxc-walker). Dynamic expressions with string literals are rewritten; unresolvable parts emit warnings.
 3. **Generate** - Extracted class names are fed to Tailwind v4's native [`compile().build()`](https://tailwindcss.com/) API to produce real CSS
 4. **Rewrite** - The original source is rewritten with indexed class names (`.node0`, `.node1`, ...) and a CSS import is prepended
 
 Each step is a pure function. The full pipeline is a single `await convert(source, filename)` call.
+
+## Dynamic Patterns
+
+Vanillify v1.1 rewrites string literals inside dynamic class expressions. Each recognized string literal gets a scoped class name and CSS — the rest of the expression structure is preserved unchanged.
+
+### Supported Patterns
+
+**Ternary expressions** — both branches are rewritten:
+
+```tsx
+className={active ? "flex gap-4" : "hidden"}
+// becomes: className={active ? "node0" : "node1"}
+```
+
+**Logical AND expressions** — the string literal on the right-hand side is rewritten:
+
+```tsx
+className={isOpen && "p-4 bg-white"}
+// becomes: className={isOpen && "node0"}
+```
+
+**Function call arguments** (`clsx`, `cn`, `classnames`, etc.) — all string literal args are rewritten:
+
+```tsx
+className={clsx("flex", "gap-4")}
+// becomes: className={clsx("node0", "node1")}
+```
+
+**Object keys (quoted)** — quoted string keys in function call arguments are rewritten:
+
+```tsx
+className={clsx({ "flex gap-4": isActive })}
+// becomes: className={clsx({ node0: isActive })}
+```
+
+**Object keys (unquoted identifiers)** — identifier keys that are valid Tailwind tokens are rewritten:
+
+```tsx
+className={clsx({ hidden: cond })}
+// becomes: className={clsx({ node0: cond })}
+```
+
+**twMerge unwrapping** — `twMerge()` calls are unwrapped and the import is removed if unused:
+
+```tsx
+className={twMerge("flex gap-4")}
+// becomes: className="node0"  (import removed if no other references)
+```
+
+**CSS Modules** — all patterns above work with `outputFormat: "css-modules"`. The syntax adapts per context:
+
+```tsx
+className={clsx({ "flex gap-4": isActive })}
+// becomes: className={clsx({ [styles.node0]: isActive })}
+```
+
+### Out of Scope
+
+These patterns are not handled and will not be rewritten:
+
+| Pattern | Reason |
+|---------|--------|
+| Variable references (`className={myVar}`) | Requires data-flow analysis across scopes |
+| Computed class tokens (`"text-" + size`) | Cannot determine the final Tailwind token statically |
+| Template literals with interpolation (`` `flex ${size}` ``) | Span replacement corrupts template delimiters |
+| Wrapper function tracing (`cn` wrapping `twMerge`) | Interprocedural analysis, beyond static AST |
+| Runtime class conflict resolution | twMerge semantics are unnecessary with vanilla CSS |
+
+### Warnings
+
+`convert()` returns a `warnings` array. Each entry has `type`, `message`, and `location`.
+
+| Warning type | When emitted |
+|--------------|--------------|
+| `unmatched-class` | A class string was passed to Tailwind but produced no CSS output |
+| `dynamic-class` | A className expression was only partially rewritten because it contains variable references or other unresolvable parts — includes `line` and `column` of the expression |
+
+A fully-rewritten expression (all string literals resolved) emits no `dynamic-class` warning.
 
 ## Why Not Regex?
 
