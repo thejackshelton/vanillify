@@ -155,7 +155,7 @@ export async function rewrite(
         const loc = offsetToLineColumn(source, containerStart);
         allWarnings.push({
           type: "dynamic-class",
-          message: `Partially rewritten className at ${loc.line}:${loc.column} — ${stats.replaced} fragment(s) rewritten, variable references remain`,
+          message: `Partially rewritten className at ${loc.line}:${loc.column} — ${stats.replaced} fragment(s) rewritten, unresolvable expressions remain`,
           location: loc,
         });
       }
