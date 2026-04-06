@@ -219,8 +219,18 @@ className={clsx({ hidden: cond })}
 
 ```tsx
 className={twMerge("flex gap-4")}
-// becomes: className="node0"  (import removed if no other references)
+// becomes: className={"node0"}  (import removed if no other references)
+
+className={twMerge("flex", "gap-4")}
+// becomes: className={"node0"}  (args joined, single scoped name)
 ```
+
+> **twMerge limitations:**
+>
+> - Only `twMerge` imported from `"tailwind-merge"` is detected. Aliased imports (`import { twMerge as tm }`) work, but re-exports through your own utility file (`import { tm } from "./utils"`) are not traced.
+> - All arguments must be string literals. If any argument is a variable or expression (e.g., `twMerge("flex", someVar)`), the entire call is left unchanged — no partial unwrapping.
+> - Only `twMerge` calls directly inside a `className`/`class` attribute are unwrapped. Calls assigned to variables (`const cls = twMerge(...)`) are not affected.
+> - The `tailwind-merge` import is removed only when no other references to the imported name remain anywhere in the file.
 
 **CSS Modules** — all patterns above work with `outputFormat: "css-modules"`. The syntax adapts per context:
 
