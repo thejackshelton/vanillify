@@ -50,4 +50,8 @@ export interface NodeEntry {
   span: { start: number; end: number };
   /** Whether this className is a dynamic expression */
   isDynamic: boolean;
+  /** Whether this entry is a fragment from a JSXExpressionContainer */
+  isFragment?: boolean;
+  /** Byte offset start of the enclosing JSXExpressionContainer (for grouping fragments) */
+  containerStart?: number;
 }

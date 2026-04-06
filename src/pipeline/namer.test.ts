@@ -47,6 +47,19 @@ describe("assignNames", () => {
     const nameMap = assignNames(entries);
     expect(nameMap.size).toBe(0);
   });
+
+  it("names fragment entries (isDynamic false, isFragment true)", () => {
+    const entries: NodeEntry[] = [
+      { nodeIndex: 0, classNames: ["flex"], span: { start: 0, end: 10 }, isDynamic: false },
+      { nodeIndex: 1, classNames: ["gap-4"], span: { start: 39, end: 51 }, isDynamic: false, isFragment: true, containerStart: 30 },
+      { nodeIndex: 2, classNames: ["hidden"], span: { start: 55, end: 65 }, isDynamic: false, isFragment: true, containerStart: 30 },
+    ];
+    const nameMap = assignNames(entries);
+    expect(nameMap.get(0)).toBe("node0");
+    expect(nameMap.get(1)).toBe("node1");
+    expect(nameMap.get(2)).toBe("node2");
+    expect(nameMap.size).toBe(3);
+  });
 });
 
 describe("selectorFor", () => {

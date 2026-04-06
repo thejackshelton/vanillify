@@ -1,6 +1,6 @@
 {
   "name": "vanillify",
-  "version": "1.0.0",
+  "version": "0.0.1",
   "description": "Tailwind CSS to vanilla CSS converter powered by Tailwind CSS and oxc-parser",
   "license": "MIT",
   "bin": {
