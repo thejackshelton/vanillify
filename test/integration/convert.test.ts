@@ -253,3 +253,82 @@ describe("convert - fixture snapshots (PKG-03)", () => {
     expect(dynamicWarnings).toHaveLength(0);
   });
 });
+
+describe("dynamic expression rewriting (Phase 1)", () => {
+  it("rewrites ternary string literals to scoped names with CSS (SC-1)", async () => {
+    const source = 'const A = () => <div className={cond ? "flex gap-4" : "hidden"}>hi</div>';
+    const result = await convert(source, "test.tsx");
+
+    // Both branches rewritten
+    expect(result.component).toContain("node0");
+    expect(result.component).toContain("node1");
+    expect(result.component).not.toContain("flex gap-4");
+    expect(result.component).not.toContain('"hidden"');
+    // Ternary structure preserved
+    expect(result.component).toContain("cond ?");
+    // CSS generated for both
+    expect(result.css).toContain(".node0");
+    expect(result.css).toContain(".node1");
+  });
+
+  it("leaves empty string untouched in ternary alternate (SC-2)", async () => {
+    const source = 'const A = () => <div className={cond ? "p-4" : ""}>hi</div>';
+    const result = await convert(source, "test.tsx");
+
+    expect(result.component).toContain("node0"); // p-4 rewritten
+    expect(result.component).toContain('""'); // empty string preserved
+  });
+
+  it("leaves zero-match strings as-is in source (SC-3)", async () => {
+    const source = 'const A = () => <div className={cond ? "not-a-utility" : "also-not"}>hi</div>';
+    const result = await convert(source, "test.tsx");
+
+    expect(result.component).toContain('"not-a-utility"');
+    expect(result.component).toContain('"also-not"');
+    expect(result.component).not.toContain("node0");
+  });
+
+  it("preserves variable references and spread elements unchanged (SC-4)", async () => {
+    const source = 'const A = () => <div className={cond ? someVar : "flex"}>hi</div>';
+    const result = await convert(source, "test.tsx");
+
+    expect(result.component).toContain("someVar"); // variable preserved
+    expect(result.component).toContain("node0"); // "flex" rewritten
+  });
+
+  it("emits no warning for fully-rewritten ternary (SC-5)", async () => {
+    const source = 'const A = () => <div className={cond ? "flex gap-4" : "hidden"}>hi</div>';
+    const result = await convert(source, "test.tsx");
+
+    const dynamicWarnings = result.warnings.filter(w => w.type === "dynamic-class");
+    expect(dynamicWarnings).toHaveLength(0);
+  });
+
+  it("emits warning for partially-rewritten expression with variable ref (SC-5)", async () => {
+    const source = 'const A = () => <div className={cond ? "flex" : myVar}>hi</div>';
+    const result = await convert(source, "test.tsx");
+
+    const dynamicWarnings = result.warnings.filter(w => w.type === "dynamic-class");
+    expect(dynamicWarnings).toHaveLength(1);
+    expect(dynamicWarnings[0].message).toContain("Partially rewritten");
+  });
+
+  it("handles logical AND with string literal (DYN-01)", async () => {
+    const source = 'const A = () => <div className={isActive && "flex gap-4"}>hi</div>';
+    const result = await convert(source, "test.tsx");
+
+    expect(result.component).toContain("node0");
+    expect(result.component).not.toContain("flex gap-4");
+    expect(result.css).toContain(".node0");
+  });
+
+  it("handles clsx call with multiple string args", async () => {
+    const source = 'const A = () => <div className={clsx("flex", "gap-4")}>hi</div>';
+    const result = await convert(source, "test.tsx");
+
+    expect(result.component).toContain("node0");
+    expect(result.component).toContain("node1");
+    expect(result.css).toContain(".node0");
+    expect(result.css).toContain(".node1");
+  });
+});
