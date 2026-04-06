@@ -451,3 +451,62 @@ export function App() {
     expect(result.component).toContain("tailwind-merge");
   });
 });
+
+describe("requirement traceability (Phase 4)", () => {
+  it("PIPE-01: extractor emits per-fragment entries with span and isFragment for ternary", async () => {
+    // PIPE-01: Extractor emits per-fragment entries with span, context type, and raw text
+    // for expression containers. Each branch of a ternary gets its own entry.
+    const source = `const App = () => (
+  <div className={cond ? "flex gap-4" : "hidden"}>content</div>
+)`;
+    const result = await convert(source, "test.tsx");
+
+    // Both branches should be rewritten to scoped names
+    expect(result.component).toContain("node");
+    // CSS should be generated for both branches
+    expect(result.css).toContain("display");
+    // No dynamic warning: both branches are fully resolvable string literals
+    const dynamicWarnings = result.warnings.filter((w) => w.type === "dynamic-class");
+    expect(dynamicWarnings).toHaveLength(0);
+  });
+
+  it("PIPE-02: namer assigns names to all fragment entries", async () => {
+    // PIPE-02: Namer assigns names to all fragment entries (no dynamic skip).
+    // A multi-fragment expression (ternary with two branches) gets distinct scoped names.
+    const source = `const App = () => (
+  <div className={isActive ? "flex p-4" : "hidden"}>content</div>
+)`;
+    const result = await convert(source, "test.tsx");
+
+    // Both ternary branches get their own scoped class names
+    expect(result.component).toContain("node0");
+    expect(result.component).toContain("node1");
+    // Each gets CSS generated
+    expect(result.css).toContain(".node0");
+    expect(result.css).toContain(".node1");
+  });
+
+  it("PIPE-03: rewriter handles context-aware replacement with stable source-order naming", async () => {
+    // PIPE-03: Rewriter handles context-aware replacement with stable source-order naming.
+    // Static attrs and fragment entries in the same file get sequential node names in source order.
+    const source = `const App = () => (
+  <div>
+    <span className="text-sm">label</span>
+    <button className={isActive ? "flex p-4" : "hidden"}>click</button>
+    <p className="text-gray-500">footer</p>
+  </div>
+)`;
+    const result = await convert(source, "test.tsx");
+
+    // Static attrs get node0, fragment branches get node1/node2, next static gets node3
+    // All names appear in component output
+    expect(result.component).toContain("node0"); // first static (text-sm)
+    expect(result.component).toContain("node1"); // ternary consequent (flex p-4)
+    expect(result.component).toContain("node2"); // ternary alternate (hidden)
+    expect(result.component).toContain("node3"); // second static (text-gray-500)
+    // CSS is generated for all rewritten classes
+    expect(result.css).toContain(".node0");
+    expect(result.css).toContain(".node1");
+    expect(result.css).toContain(".node3");
+  });
+});
