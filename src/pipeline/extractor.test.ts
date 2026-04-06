@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { parse } from "./parser";
-import { extract } from "./extractor";
+import { extract, findTwMergeNames } from "./extractor";
 
 describe("extract", () => {
   it("extracts static className from a single element", () => {
@@ -368,5 +368,106 @@ describe("extract", () => {
     expect(entries).toHaveLength(1);
     expect(entries[0].classNames).toEqual(["flex"]);
     expect(entries[0].isObjectKey).toBe(true);
+  });
+});
+
+// Phase 3: twMerge unwrapping (TMR-01, TMR-02, TMR-04)
+describe("twMerge unwrapping (Phase 3)", () => {
+  it("findTwMergeNames returns Set with 'twMerge' for direct import", () => {
+    const source = `import { twMerge } from "tailwind-merge";\nconst A = () => <div />;`;
+    const { program } = parse("test.tsx", source);
+    const names = findTwMergeNames(program);
+    expect(names.has("twMerge")).toBe(true);
+    expect(names.size).toBe(1);
+  });
+
+  it("findTwMergeNames returns Set with alias for aliased import (TMR-04)", () => {
+    const source = `import { twMerge as tm } from "tailwind-merge";\nconst A = () => <div />;`;
+    const { program } = parse("test.tsx", source);
+    const names = findTwMergeNames(program);
+    expect(names.has("tm")).toBe(true);
+    expect(names.has("twMerge")).toBe(false);
+    expect(names.size).toBe(1);
+  });
+
+  it("findTwMergeNames returns empty Set for non-twMerge export from tailwind-merge", () => {
+    const source = `import { something } from "tailwind-merge";\nconst A = () => <div />;`;
+    const { program } = parse("test.tsx", source);
+    const names = findTwMergeNames(program);
+    expect(names.size).toBe(0);
+  });
+
+  it("findTwMergeNames returns empty Set for twMerge from wrong library", () => {
+    const source = `import { twMerge } from "other-lib";\nconst A = () => <div />;`;
+    const { program } = parse("test.tsx", source);
+    const names = findTwMergeNames(program);
+    expect(names.size).toBe(0);
+  });
+
+  it("single-arg twMerge produces one fragment spanning the entire CallExpression (TMR-01)", () => {
+    const source = `import { twMerge } from "tailwind-merge";\nconst A = () => <div className={twMerge("flex gap-4")} />;`;
+    const { program } = parse("test.tsx", source);
+    const twMergeNames = new Set(["twMerge"]);
+    const { entries } = extract(program, source, twMergeNames);
+
+    expect(entries).toHaveLength(1);
+    expect(entries[0].classNames).toEqual(["flex", "gap-4"]);
+    expect(entries[0].isFragment).toBe(true);
+    // The span must cover the entire CallExpression twMerge("flex gap-4"), not just the string
+    const sliced = source.slice(entries[0].span.start, entries[0].span.end);
+    expect(sliced).toBe(`twMerge("flex gap-4")`);
+  });
+
+  it("multi-arg twMerge joins args into single fragment (TMR-02)", () => {
+    const source = `import { twMerge } from "tailwind-merge";\nconst A = () => <div className={twMerge("flex", "gap-4")} />;`;
+    const { program } = parse("test.tsx", source);
+    const twMergeNames = new Set(["twMerge"]);
+    const { entries } = extract(program, source, twMergeNames);
+
+    expect(entries).toHaveLength(1);
+    expect(entries[0].classNames).toEqual(["flex", "gap-4"]);
+    expect(entries[0].isFragment).toBe(true);
+    // The span covers the entire CallExpression
+    const sliced = source.slice(entries[0].span.start, entries[0].span.end);
+    expect(sliced).toBe(`twMerge("flex", "gap-4")`);
+  });
+
+  it("twMerge with non-Literal arg produces zero fragments (unresolvable)", () => {
+    const source = `const A = () => <div className={twMerge(cond ? "a" : "b")} />;`;
+    const { program } = parse("test.tsx", source);
+    const twMergeNames = new Set(["twMerge"]);
+    const { entries } = extract(program, source, twMergeNames);
+
+    expect(entries).toHaveLength(0);
+  });
+
+  it("aliased tm() call produces one fragment when tm is in twMergeNames (TMR-04)", () => {
+    const source = `import { twMerge as tm } from "tailwind-merge";\nconst A = () => <div className={tm("flex gap-4")} />;`;
+    const { program } = parse("test.tsx", source);
+    const twMergeNames = new Set(["tm"]);
+    const { entries } = extract(program, source, twMergeNames);
+
+    expect(entries).toHaveLength(1);
+    expect(entries[0].classNames).toEqual(["flex", "gap-4"]);
+    const sliced = source.slice(entries[0].span.start, entries[0].span.end);
+    expect(sliced).toBe(`tm("flex gap-4")`);
+  });
+
+  it("expressionHasUnresolvable returns true for twMerge(someVar) when twMerge is in twMergeNames", () => {
+    const source = `const A = () => <div className={twMerge(someVar)} />;`;
+    const { program } = parse("test.tsx", source);
+    const twMergeNames = new Set(["twMerge"]);
+    const { unresolvableContainers } = extract(program, source, twMergeNames);
+
+    expect(unresolvableContainers?.size).toBe(1);
+  });
+
+  it("expressionHasUnresolvable returns false for twMerge('flex') when twMerge is in twMergeNames", () => {
+    const source = `const A = () => <div className={twMerge("flex")} />;`;
+    const { program } = parse("test.tsx", source);
+    const twMergeNames = new Set(["twMerge"]);
+    const { unresolvableContainers } = extract(program, source, twMergeNames);
+
+    expect(unresolvableContainers?.size).toBe(0);
   });
 });
