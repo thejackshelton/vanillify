@@ -393,3 +393,61 @@ describe("object key and CSS Modules rewriting (Phase 2)", () => {
     expect(result.component).toContain("[styles.node0]: hidden");
   });
 });
+
+describe("twMerge cleanup (Phase 3)", () => {
+  it("TMR-01: single-arg twMerge is unwrapped and CSS generated", async () => {
+    const source = `import { twMerge } from "tailwind-merge";
+export function App() { return <div className={twMerge("flex gap-4")} />; }`;
+    const result = await convert(source, "test.tsx");
+
+    expect(result.component).not.toContain("twMerge");
+    expect(result.component).toContain('"node0"');
+    expect(result.css).toContain(".node0");
+    expect(result.css).toContain("display");
+  });
+
+  it("TMR-02: multi-arg twMerge joins args and produces single scoped name", async () => {
+    const source = `import { twMerge } from "tailwind-merge";
+export function App() { return <div className={twMerge("flex", "gap-4")} />; }`;
+    const result = await convert(source, "test.tsx");
+
+    expect(result.component).not.toContain("twMerge");
+    expect(result.component).toContain('"node0"');
+    expect(result.css).toContain(".node0");
+    // CSS should contain rules for both flex and gap-4 merged into node0
+    expect(result.css).toContain("display");
+    expect(result.css).toContain("gap");
+  });
+
+  it("TMR-03: tailwind-merge import is removed from output when no other references remain", async () => {
+    const source = `import { twMerge } from "tailwind-merge";
+export function App() { return <div className={twMerge("flex gap-4")} />; }`;
+    const result = await convert(source, "test.tsx");
+
+    expect(result.component).not.toContain("tailwind-merge");
+    expect(result.component).not.toContain("twMerge");
+  });
+
+  it("TMR-04: aliased import and tm() call are unwrapped correctly", async () => {
+    const source = `import { twMerge as tm } from "tailwind-merge";
+export function App() { return <div className={tm("flex gap-4")} />; }`;
+    const result = await convert(source, "test.tsx");
+
+    expect(result.component).not.toContain("tailwind-merge");
+    expect(result.component).not.toContain("tm(");
+    expect(result.component).toContain('"node0"');
+    expect(result.css).toContain(".node0");
+  });
+
+  it("preserves import when twMerge is used outside className attribute", async () => {
+    const source = `import { twMerge } from "tailwind-merge";
+export function App() {
+  const cls = twMerge("flex", "gap-4");
+  return <div className={twMerge("bg-red-500")} />;
+}`;
+    const result = await convert(source, "test.tsx");
+
+    // twMerge is still referenced in `const cls = twMerge(...)` outside className
+    expect(result.component).toContain("tailwind-merge");
+  });
+});
