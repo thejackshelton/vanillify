@@ -7,6 +7,7 @@ import { basename, dirname, join, resolve } from "pathe";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { convert } from "./index";
 import type { ConvertOptions, OutputFormat } from "./types";
+import pkg from "../package.json" with { type: "json" };
 
 /** Matches JSX/TSX file extensions at end of string */
 const EXT_RE = createRegExp(
@@ -16,7 +17,7 @@ const EXT_RE = createRegExp(
 const main = defineCommand({
   meta: {
     name: "vanillify",
-    version: "0.0.1",
+    version: pkg.version,
     description: "Convert Tailwind CSS classes to vanilla CSS",
   },
   args: {

@@ -183,8 +183,8 @@ Vanillify v1.1 rewrites string literals inside dynamic class expressions. Each r
 **Ternary expressions** — both branches are rewritten:
 
 ```tsx
-className={active ? "flex gap-4" : "hidden"}
-// becomes: className={active ? "node0" : "node1"}
+class={active ? "flex gap-4" : "hidden"}
+// becomes: class={active ? "node0" : "node1"}
 ```
 
 **Logical AND expressions** — the string literal on the right-hand side is rewritten:
