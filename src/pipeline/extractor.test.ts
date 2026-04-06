@@ -200,4 +200,101 @@ describe("extract", () => {
     expect(entries[0].classNames).toEqual(["flex", "gap-4"]);
     expect(entries[0].isFragment).toBe(true);
   });
+
+  // Phase 2: ObjectExpression support (DYN-02, DYN-03)
+
+  it("extracts quoted object key as fragment with isObjectKey=true (DYN-02)", () => {
+    const source = 'const A = () => <div className={clsx({ "flex gap-4": isActive })}>hi</div>';
+    const { program } = parse("test.tsx", source);
+    const { entries } = extract(program, source);
+
+    expect(entries).toHaveLength(1);
+    expect(entries[0].classNames).toEqual(["flex", "gap-4"]);
+    expect(entries[0].isFragment).toBe(true);
+    expect(entries[0].isObjectKey).toBe(true);
+  });
+
+  it("extracts unquoted identifier key as fragment with isObjectKey=true (DYN-03)", () => {
+    const source = 'const A = () => <div className={clsx({ hidden: cond })}>hi</div>';
+    const { program } = parse("test.tsx", source);
+    const { entries } = extract(program, source);
+
+    expect(entries).toHaveLength(1);
+    expect(entries[0].classNames).toEqual(["hidden"]);
+    expect(entries[0].isFragment).toBe(true);
+    expect(entries[0].isObjectKey).toBe(true);
+  });
+
+  it("extracts shorthand property as isObjectKey (shorthand treated as Identifier key)", () => {
+    const source = 'const A = () => <div className={clsx({ hidden })}>hi</div>';
+    const { program } = parse("test.tsx", source);
+    const { entries } = extract(program, source);
+
+    expect(entries).toHaveLength(1);
+    expect(entries[0].classNames).toEqual(["hidden"]);
+    expect(entries[0].isObjectKey).toBe(true);
+  });
+
+  it("extracts multiple object keys in mixed object with both isObjectKey=true", () => {
+    const source = 'const A = () => <div className={clsx({ "flex": a, hidden: b })}>hi</div>';
+    const { program } = parse("test.tsx", source);
+    const { entries } = extract(program, source);
+
+    expect(entries).toHaveLength(2);
+    expect(entries[0].classNames).toEqual(["flex"]);
+    expect(entries[0].isObjectKey).toBe(true);
+    expect(entries[1].classNames).toEqual(["hidden"]);
+    expect(entries[1].isObjectKey).toBe(true);
+  });
+
+  it("skips computed keys in ObjectExpression (DYN-06 preserved)", () => {
+    const source = 'const A = () => <div className={clsx({ [someVar]: cond })}>hi</div>';
+    const { program } = parse("test.tsx", source);
+    const { entries } = extract(program, source);
+
+    expect(entries).toHaveLength(0);
+  });
+
+  it("skips SpreadElement in ObjectExpression", () => {
+    const source = 'const A = () => <div className={clsx({ ...spread })}>hi</div>';
+    const { program } = parse("test.tsx", source);
+    const { entries } = extract(program, source);
+
+    expect(entries).toHaveLength(0);
+  });
+
+  it("expressionHasUnresolvable: ObjectExpression with computed key returns true", () => {
+    const source = 'const A = () => <div className={clsx({ [someVar]: cond })}>hi</div>';
+    const { program } = parse("test.tsx", source);
+    const { unresolvableContainers } = extract(program, source);
+
+    expect(unresolvableContainers?.size).toBe(1);
+  });
+
+  it("expressionHasUnresolvable: ObjectExpression with only Literal/Identifier keys returns false", () => {
+    const source = 'const A = () => <div className={clsx({ "flex": a, hidden: b })}>hi</div>';
+    const { program } = parse("test.tsx", source);
+    const { unresolvableContainers } = extract(program, source);
+
+    // No unresolvable containers (all keys are Literals or Identifiers)
+    expect(unresolvableContainers?.size).toBe(0);
+  });
+
+  it("expressionHasUnresolvable: ObjectExpression with SpreadElement returns true", () => {
+    const source = 'const A = () => <div className={clsx({ ...spread })}>hi</div>';
+    const { program } = parse("test.tsx", source);
+    const { unresolvableContainers } = extract(program, source);
+
+    expect(unresolvableContainers?.size).toBe(1);
+  });
+
+  it("extracts nested ObjectExpression inside LogicalExpression inside CallExpression", () => {
+    const source = 'const A = () => <div className={clsx(cond && { "flex": true })}>hi</div>';
+    const { program } = parse("test.tsx", source);
+    const { entries } = extract(program, source);
+
+    expect(entries).toHaveLength(1);
+    expect(entries[0].classNames).toEqual(["flex"]);
+    expect(entries[0].isObjectKey).toBe(true);
+  });
 });

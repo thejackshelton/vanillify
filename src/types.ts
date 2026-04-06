@@ -54,4 +54,6 @@ export interface NodeEntry {
   isFragment?: boolean;
   /** Byte offset start of the enclosing JSXExpressionContainer (for grouping fragments) */
   containerStart?: number;
+  /** Whether this fragment is an object property key (for clsx/cn-style conditionals) */
+  isObjectKey?: boolean;
 }

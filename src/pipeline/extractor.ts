@@ -18,6 +18,7 @@ export interface ExtractResult {
 interface Fragment {
   value: string;
   span: { start: number; end: number };
+  isObjectKey?: boolean;
 }
 
 /**
@@ -73,6 +74,7 @@ export function extract(program: any, source: string): ExtractResult {
               isDynamic: false,
               isFragment: true,
               containerStart,
+              isObjectKey: frag.isObjectKey,
             });
           }
         }
@@ -123,6 +125,28 @@ function collectFragments(expression: any): Fragment[] {
     return results;
   }
 
+  // ObjectExpression: extract Literal and Identifier keys as object key fragments
+  if (expression.type === "ObjectExpression") {
+    for (const prop of expression.properties ?? []) {
+      if (prop.type === "SpreadElement") continue;
+      if (prop.computed) continue;
+      const key = prop.key;
+      let value: string | undefined;
+      let span: { start: number; end: number };
+      if (key.type === "Literal" && typeof key.value === "string") {
+        value = key.value;
+        span = { start: key.start, end: key.end };
+      } else if (key.type === "Identifier") {
+        value = key.name;
+        span = { start: key.start, end: key.end };
+      } else {
+        continue;
+      }
+      results.push({ value, span, isObjectKey: true });
+    }
+    return results;
+  }
+
   // All other types (Identifier, MemberExpression, SpreadElement, TemplateLiteral, etc.)
   // are unresolvable -- return empty
   return results;
@@ -157,6 +181,14 @@ function expressionHasUnresolvable(expression: any): boolean {
   if (expression.type === "CallExpression") {
     // callee is the function, not a class value -- only recurse arguments
     return (expression.arguments ?? []).some((arg: any) => expressionHasUnresolvable(arg));
+  }
+
+  if (expression.type === "ObjectExpression") {
+    return (expression.properties ?? []).some((prop: any) => {
+      if (prop.type === "SpreadElement") return true;
+      if (prop.computed) return true;
+      return false;
+    });
   }
 
   // Identifier, MemberExpression, TemplateLiteral with interpolations, SpreadElement, etc.
