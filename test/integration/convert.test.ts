@@ -332,3 +332,56 @@ describe("dynamic expression rewriting (Phase 1)", () => {
     expect(result.css).toContain(".node1");
   });
 });
+
+describe("object key and CSS Modules rewriting (Phase 2)", () => {
+  it("rewrites quoted object keys in clsx-style expressions (DYN-02)", async () => {
+    const source = `const A = () => <div className={clsx({ "flex gap-4": isActive })}>hi</div>`;
+    const result = await convert(source, "test.tsx");
+    expect(result.component).toContain("node0");
+    expect(result.component).not.toContain("flex gap-4");
+    expect(result.css).toContain(".node0");
+    expect(result.css).toContain("display");
+  });
+
+  it("rewrites unquoted identifier keys in clsx-style expressions (DYN-03)", async () => {
+    const source = `const A = () => <div className={clsx({ hidden: cond })}>hi</div>`;
+    const result = await convert(source, "test.tsx");
+    expect(result.component).toContain("node0");
+    expect(result.component).not.toContain("hidden");
+    // 'hidden' is a valid Tailwind utility -- verify CSS generated
+    expect(result.css).toContain(".node0");
+  });
+
+  it("uses [styles.nodeN] for object keys in css-modules mode (DYN-05)", async () => {
+    const source = `const A = () => <div className={clsx({ "flex gap-4": isActive, hidden: cond })}>hi</div>`;
+    const result = await convert(source, "test.tsx", { outputFormat: "css-modules" });
+    expect(result.component).toContain("[styles.node0]");
+    expect(result.component).toContain("[styles.node1]");
+    expect(result.component).not.toContain("flex gap-4");
+  });
+
+  it("uses styles.nodeN without braces for fragment expressions in css-modules mode (DYN-05)", async () => {
+    const source = `const A = () => <div className={active ? "flex" : "hidden"}>hi</div>`;
+    const result = await convert(source, "test.tsx", { outputFormat: "css-modules" });
+    // Must NOT have {styles.node0} (object literal form) -- must be styles.node0 (member access)
+    expect(result.component).not.toMatch(/\{styles\.node\d+\}/);
+    expect(result.component).toContain("styles.node0");
+    expect(result.component).toContain("styles.node1");
+  });
+
+  it("handles mixed object keys and string literals in same clsx call", async () => {
+    const source = `const A = () => <div className={clsx("flex", { hidden: cond })}>hi</div>`;
+    const result = await convert(source, "test.tsx");
+    // "flex" is a string literal fragment, "hidden" is an object key fragment
+    expect(result.component).toContain("node0"); // flex
+    expect(result.component).toContain("node1"); // hidden
+    expect(result.component).not.toContain('"flex"');
+  });
+
+  it("rewrites shorthand property key in clsx call", async () => {
+    const source = `const A = () => <div className={clsx({ hidden })}>hi</div>`;
+    const result = await convert(source, "test.tsx");
+    expect(result.component).toContain("node0");
+    expect(result.css).toContain(".node0");
+  });
+});
