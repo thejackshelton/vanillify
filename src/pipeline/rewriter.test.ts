@@ -17,9 +17,9 @@ async function rewriteFromSource(
   outputFormat?: OutputFormat,
 ) {
   const { program } = parse(filename, source);
-  const { entries, warnings } = extract(program, source);
+  const { entries, warnings, unresolvableContainers } = extract(program, source);
   const nameMap = assignNames(entries);
-  return rewrite(source, entries, nameMap, warnings, css, outputFormat, filename);
+  return rewrite(source, entries, nameMap, warnings, css, outputFormat, filename, unresolvableContainers);
 }
 
 describe("rewrite", () => {
@@ -40,15 +40,57 @@ describe("rewrite", () => {
     expect(result.css).toContain("padding");
   });
 
-  it("rewrites string literal fragments from ternary expressions", async () => {
+  it("rewrites string literals inside dynamic className expressions", async () => {
     const source = '<div className={active ? "bg-blue-500" : "bg-gray-500"}>hi</div>';
     const result = await rewriteFromSource(source);
 
-    // Fragment entries are rewritten to indexed names
-    expect(result.component).toContain('"node0"');
-    expect(result.component).toContain('"node1"');
-    // The ternary structure itself remains but string literals are replaced
-    expect(result.component).toContain('active ?');
+    // Both branches should be rewritten to scoped names
+    expect(result.component).toContain("node0");
+    expect(result.component).toContain("node1");
+    expect(result.component).not.toContain("bg-blue-500");
+    expect(result.component).not.toContain("bg-gray-500");
+    // Ternary structure preserved
+    expect(result.component).toContain("active ?");
+  });
+
+  it("preserves zero-match fragment strings in source (DYN-07)", async () => {
+    const source = '<div className={cond ? "flex" : "not-a-utility"}>hi</div>';
+    const result = await rewriteFromSource(source);
+
+    expect(result.component).toContain("node0"); // flex -> node0
+    expect(result.component).toContain('"not-a-utility"'); // unchanged
+    expect(result.component).toContain("cond ?"); // ternary preserved
+  });
+
+  it("emits no warning for fully-rewritten expression (DYN-08)", async () => {
+    const source = '<div className={cond ? "flex gap-4" : "hidden"}>hi</div>';
+    const result = await rewriteFromSource(source);
+
+    const dynamicWarnings = result.warnings.filter(w => w.type === "dynamic-class");
+    expect(dynamicWarnings).toHaveLength(0);
+  });
+
+  it("emits warning for partially-rewritten expression with variable ref (DYN-08)", async () => {
+    const source = '<div className={cond ? "flex" : myVar}>hi</div>';
+    const result = await rewriteFromSource(source);
+
+    const dynamicWarnings = result.warnings.filter(w => w.type === "dynamic-class");
+    expect(dynamicWarnings).toHaveLength(1);
+    expect(dynamicWarnings[0].message).toContain("Partially rewritten");
+    expect(dynamicWarnings[0].message).toContain("1 fragment(s) rewritten");
+  });
+
+  it("handles multiple fragment replacements without offset drift", async () => {
+    const source = '<div className={a ? "flex gap-4" : "hidden p-2"}>hi</div>';
+    const result = await rewriteFromSource(source);
+
+    expect(result.component).toContain("node0");
+    expect(result.component).toContain("node1");
+    expect(result.component).not.toContain("flex gap-4");
+    expect(result.component).not.toContain("hidden p-2");
+    // Both have generated CSS
+    expect(result.css).toContain(".node0");
+    expect(result.css).toContain(".node1");
   });
 
   it("handles multiple nodes with separate CSS blocks", async () => {
