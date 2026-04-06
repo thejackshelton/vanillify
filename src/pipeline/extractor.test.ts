@@ -176,6 +176,36 @@ describe("extract", () => {
     expect(unresolvableContainers?.size).toBe(1);
   });
 
+  it("unwraps ParenthesizedExpression in dynamic className", () => {
+    const source = 'const A = () => <div className={(cond ? "flex" : "hidden")}>hi</div>';
+    const { program } = parse("test.tsx", source);
+    const { entries } = extract(program, source);
+
+    expect(entries).toHaveLength(2);
+    expect(entries[0].classNames).toEqual(["flex"]);
+    expect(entries[1].classNames).toEqual(["hidden"]);
+  });
+
+  it("unwraps TSAsExpression in dynamic className", () => {
+    const source = 'const A = () => <div className={(cond ? "flex" : "hidden") as string}>hi</div>';
+    const { program } = parse("test.tsx", source);
+    const { entries } = extract(program, source);
+
+    expect(entries).toHaveLength(2);
+    expect(entries[0].classNames).toEqual(["flex"]);
+    expect(entries[1].classNames).toEqual(["hidden"]);
+  });
+
+  it("does NOT extract left side of && (condition, not class value)", () => {
+    const source = 'const A = () => <div className={"flex" && "gap-4"}>hi</div>';
+    const { program } = parse("test.tsx", source);
+    const { entries } = extract(program, source);
+
+    // Only "gap-4" (right side) should be extracted, not "flex" (condition)
+    expect(entries).toHaveLength(1);
+    expect(entries[0].classNames).toEqual(["gap-4"]);
+  });
+
   it("extracts fragments from clsx call arguments (DYN-01)", () => {
     const source = 'const A = () => <div className={clsx("flex", cond && "gap-4")}>hi</div>';
     const { program } = parse("test.tsx", source);

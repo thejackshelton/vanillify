@@ -97,6 +97,14 @@ function collectFragments(expression: any): Fragment[] {
   const results: Fragment[] = [];
   if (!expression) return results;
 
+  // Unwrap parentheses and TS type wrappers
+  if (expression.type === "ParenthesizedExpression") {
+    return collectFragments(expression.expression);
+  }
+  if (expression.type === "TSAsExpression" || expression.type === "TSNonNullExpression" || expression.type === "TSSatisfiesExpression") {
+    return collectFragments(expression.expression);
+  }
+
   // String literal leaf -- the rewritable unit
   if (expression.type === "Literal" && typeof expression.value === "string") {
     results.push({ value: expression.value, span: { start: expression.start, end: expression.end } });
@@ -110,10 +118,16 @@ function collectFragments(expression: any): Fragment[] {
     return results;
   }
 
-  // Logical AND / OR / nullish coalescing: recurse both sides
+  // Logical AND / OR / nullish coalescing
   if (expression.type === "LogicalExpression") {
-    results.push(...collectFragments(expression.left));
-    results.push(...collectFragments(expression.right));
+    // For &&: left is a condition, only recurse right (the class value)
+    // For || and ??: both sides are class value positions
+    if (expression.operator === "&&") {
+      results.push(...collectFragments(expression.right));
+    } else {
+      results.push(...collectFragments(expression.left));
+      results.push(...collectFragments(expression.right));
+    }
     return results;
   }
 
@@ -161,6 +175,14 @@ function collectFragments(expression: any): Fragment[] {
  */
 function expressionHasUnresolvable(expression: any): boolean {
   if (!expression) return false;
+
+  // Unwrap parentheses and TS type wrappers
+  if (expression.type === "ParenthesizedExpression" ||
+      expression.type === "TSAsExpression" ||
+      expression.type === "TSNonNullExpression" ||
+      expression.type === "TSSatisfiesExpression") {
+    return expressionHasUnresolvable(expression.expression);
+  }
 
   if (expression.type === "Literal" && typeof expression.value === "string") {
     return false;
