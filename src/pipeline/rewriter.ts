@@ -84,6 +84,7 @@ export async function rewrite(
   outputFormat?: OutputFormat,
   filename?: string,
   unresolvableContainers?: Map<number, boolean>,
+  twMergeNames?: Set<string>,
 ): Promise<RewriteResult> {
   const allWarnings: Warning[] = [...extractWarnings];
   const cssBlocks: string[] = [];

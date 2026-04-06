@@ -1,5 +1,5 @@
 import { parse } from "./pipeline/parser";
-import { extract } from "./pipeline/extractor";
+import { extract, findTwMergeNames } from "./pipeline/extractor";
 import { assignNames } from "./pipeline/namer";
 import { rewrite } from "./pipeline/rewriter";
 import type { ConvertOptions, ConvertResult } from "./types";
@@ -28,17 +28,21 @@ export async function convert(
   // 1. Parse source to AST
   const { program } = parse(filename, source);
 
-  // 2. Extract class entries from AST
-  const { entries, warnings: extractWarnings, unresolvableContainers } = extract(program, source);
+  // 2. Scan for twMerge local names (Phase 3: TMR-01 through TMR-04)
+  const twMergeNames = findTwMergeNames(program);
 
-  // 3. Assign indexed class names
+  // 3. Extract class entries from AST (pass twMergeNames for twMerge-aware extraction)
+  const { entries, warnings: extractWarnings, unresolvableContainers } = extract(program, source, twMergeNames);
+
+  // 4. Assign indexed class names
   const nameMap = assignNames(entries);
 
-  // 4. Rewrite source and generate per-node CSS via Tailwind engine
+  // 5. Rewrite source and generate per-node CSS via Tailwind engine
   // Pass raw CSS string directly — Tailwind handles @theme and @custom-variant natively
+  // Pass twMergeNames for post-rewrite import removal (Task 2 / TMR-03)
   const result = await rewrite(
     source, entries, nameMap, extractWarnings,
-    options?.css, options?.outputFormat, filename, unresolvableContainers,
+    options?.css, options?.outputFormat, filename, unresolvableContainers, twMergeNames,
   );
 
   return {
